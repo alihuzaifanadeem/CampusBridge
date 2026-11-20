@@ -1,0 +1,43 @@
+services:
+  database:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: campusbridge
+      POSTGRES_USER: campusbridge
+      POSTGRES_PASSWORD: campusbridge_dev
+    volumes:
+      - campusbridge-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campusbridge -d campusbridge"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://campusbridge:campusbridge_dev@database:5432/campusbridge
+      SECRET_KEY: ${SECRET_KEY:-local-development-key-change-before-deployment}
+      TOKEN_TTL_HOURS: 24
+      SEED_DEMO_DATA: "true"
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+    depends_on:
+      database:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_TARGET: http://api:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  campusbridge-data:
