@@ -16,7 +16,7 @@ The first API startup creates the PostgreSQL tables and inserts clearly marked d
 
 ### PostgreSQL data and schema
 
-Docker Compose runs PostgreSQL 16 in the `database` service. FastAPI connects to it at `database:5432` on Compose's private network. The database files are kept in the named Docker volume `campusbridge-data`, not in a source-code folder. SQLAlchemy models and the database connection are defined in `backend/app/main.py`; the API creates the tables at startup. To inspect the database, run:
+Docker Compose runs PostgreSQL 16 in the `database` service. FastAPI connects to it at `database:5432` on Compose's private network. The database files are kept in the named Docker volume `campusbridge-data`, not in a source-code folder. The PostgreSQL engine and session are configured in `backend/app/database/connection.py`, and ORM models are in `backend/app/database/models.py`. The API creates the tables at startup. To inspect the database, run:
 
 ```sh
 docker compose exec database psql -U campusbridge -d campusbridge
@@ -72,9 +72,11 @@ The sign-in page also has one-click demo entry. Demo mode stores sample changes 
 ## Project structure
 
 ```text
-frontend/     React application and Vite configuration
-backend/      FastAPI routes, SQLAlchemy models, and PostgreSQL access
-docs/         Requirement analysis and design-to-implementation mapping
+frontend/                  React application and Vite configuration
+backend/
+  app/main.py              FastAPI routes and application startup
+  app/database/            PostgreSQL connection, sessions, and SQLAlchemy models
+docs/                       Requirement analysis and design-to-implementation mapping
 ```
 
 ## Prototype boundaries
