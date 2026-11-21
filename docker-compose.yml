@@ -23,6 +23,9 @@ services:
       TOKEN_TTL_HOURS: 24
       SEED_DEMO_DATA: "true"
       CORS_ORIGINS: http://localhost:5173
+      MEDIA_DIR: /app/media
+    volumes:
+      - campusbridge-media:/app/media
     ports:
       - "8000:8000"
     depends_on:
@@ -41,3 +44,4 @@ services:
 
 volumes:
   campusbridge-data:
+  campusbridge-media:

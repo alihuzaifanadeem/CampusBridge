@@ -6,12 +6,15 @@ import hmac
 import json
 import os
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import func, or_, select
@@ -186,6 +189,12 @@ class AdminUserUpdate(BaseModel):
 
 class ProfileCoverUpdate(BaseModel):
     theme: Literal["blue", "violet", "teal", "sunset"]
+    width: int = Field(default=1600, ge=320, le=2400)
+    height: int = Field(default=177, ge=100, le=500)
+
+
+PROFILE_COVER_MEDIA_DIR = Path(os.getenv("MEDIA_DIR", str(Path(__file__).resolve().parents[1] / "media")))
+PROFILE_COVER_MAX_BYTES = 2 * 1024 * 1024
 
 
 def user_dict(user: User) -> dict[str, Any]:
@@ -551,27 +560,109 @@ def admin_overview(db: Session = Depends(get_db), user: User = Depends(require_r
 
 
 @app.get("/api/profile-cover")
-def get_profile_cover(db: Session = Depends(get_db)) -> dict[str, str]:
-    setting = db.get(SiteSetting, "profile_cover_theme")
-    theme = setting.value if setting and setting.value in {"blue", "violet", "teal", "sunset"} else "blue"
-    return {"theme": theme}
+def get_profile_cover(db: Session = Depends(get_db)) -> dict[str, Any]:
+    theme_setting = db.get(SiteSetting, "profile_cover_theme")
+    image_setting = db.get(SiteSetting, "profile_cover_image")
+    width_setting = db.get(SiteSetting, "profile_cover_width")
+    height_setting = db.get(SiteSetting, "profile_cover_height")
+    theme = theme_setting.value if theme_setting and theme_setting.value in {"blue", "violet", "teal", "sunset"} else "blue"
+    width = int(width_setting.value) if width_setting and width_setting.value.isdigit() else 1600
+    height = int(height_setting.value) if height_setting and height_setting.value.isdigit() else 177
+    image_version = int(image_setting.updated_at.timestamp() * 1_000_000) if image_setting else 0
+    return {
+        "theme": theme,
+        "width": width,
+        "height": height,
+        "image_url": f"/api/profile-cover/image?v={image_version}" if image_setting else None,
+    }
+
+
+@app.get("/api/profile-cover/image")
+def get_profile_cover_image(db: Session = Depends(get_db)) -> FileResponse:
+    setting = db.get(SiteSetting, "profile_cover_image")
+    if not setting or not setting.value:
+        raise HTTPException(status_code=404, detail="No shared profile cover image is configured.")
+    filename = setting.value
+    extensions = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}
+    extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
+    stem = filename.rsplit(".", 1)[0] if "." in filename else ""
+    if len(stem) != 32 or any(char not in "0123456789abcdef" for char in stem) or extension not in extensions:
+        raise HTTPException(status_code=404, detail="The shared profile cover image is unavailable.")
+    path = PROFILE_COVER_MEDIA_DIR / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="The shared profile cover image is unavailable.")
+    return FileResponse(path, media_type=extensions[extension], headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.put("/api/admin/profile-cover")
-def update_profile_cover(
-    body: ProfileCoverUpdate,
+async def update_profile_cover(
+    theme: Literal["blue", "violet", "teal", "sunset"] = Form(...),
+    width: int = Form(default=1600, ge=320, le=2400),
+    height: int = Form(default=177, ge=100, le=500),
+    image: UploadFile | None = File(default=None),
+    remove_image: bool = Form(default=False),
     db: Session = Depends(get_db),
     actor: User = Depends(require_roles("admin", "system_admin")),
-) -> dict[str, str]:
-    setting = db.get(SiteSetting, "profile_cover_theme")
-    if setting is None:
-        setting = SiteSetting(key="profile_cover_theme", value=body.theme)
-        db.add(setting)
-    else:
-        setting.value = body.theme
-        setting.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    return {"theme": setting.value}
+) -> dict[str, Any]:
+    body = ProfileCoverUpdate(theme=theme, width=width, height=height)
+    old_image_setting = db.get(SiteSetting, "profile_cover_image")
+    old_filename = old_image_setting.value if old_image_setting else None
+    new_filename = None
+    image_bytes = None
+
+    if image is not None:
+        image_bytes = await image.read(PROFILE_COVER_MAX_BYTES + 1)
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="Choose a non-empty image file.")
+        if len(image_bytes) > PROFILE_COVER_MAX_BYTES:
+            raise HTTPException(status_code=413, detail="Profile cover images must be 2 MB or smaller.")
+        if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            extension = "png"
+        elif image_bytes.startswith(b"\xff\xd8\xff"):
+            extension = "jpg"
+        elif image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+            extension = "webp"
+        else:
+            raise HTTPException(status_code=415, detail="Use a PNG, JPG, or WebP image.")
+        new_filename = f"{uuid.uuid4().hex}.{extension}"
+        PROFILE_COVER_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+        (PROFILE_COVER_MEDIA_DIR / new_filename).write_bytes(image_bytes)
+
+    def save_setting(key: str, value: str) -> SiteSetting:
+        setting = db.get(SiteSetting, key)
+        if setting is None:
+            setting = SiteSetting(key=key, value=value)
+            db.add(setting)
+        else:
+            setting.value = value
+            setting.updated_at = datetime.now(timezone.utc)
+        return setting
+
+    save_setting("profile_cover_theme", body.theme)
+    save_setting("profile_cover_width", str(body.width))
+    save_setting("profile_cover_height", str(body.height))
+    if new_filename:
+        save_setting("profile_cover_image", new_filename)
+    elif remove_image and old_image_setting:
+        db.delete(old_image_setting)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        if new_filename:
+            (PROFILE_COVER_MEDIA_DIR / new_filename).unlink(missing_ok=True)
+        raise
+
+    if old_filename and (new_filename or remove_image):
+        (PROFILE_COVER_MEDIA_DIR / old_filename).unlink(missing_ok=True)
+    image_setting = db.get(SiteSetting, "profile_cover_image")
+    image_version = int(image_setting.updated_at.timestamp() * 1_000_000) if image_setting else 0
+    return {
+        "theme": body.theme,
+        "width": body.width,
+        "height": body.height,
+        "image_url": f"/api/profile-cover/image?v={image_version}" if image_setting else None,
+    }
 
 
 @app.get("/api/admin/users")

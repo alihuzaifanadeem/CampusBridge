@@ -22,7 +22,7 @@ Docker Compose runs PostgreSQL 16 in the `database` service. FastAPI connects to
 docker compose exec database psql -U campusbridge -d campusbridge
 ```
 
-`docker compose down` stops the containers and preserves the database volume. The database remains available the next time you run `docker compose up`.
+`docker compose down` stops the containers and preserves the database and uploaded-cover image volumes. They remain available the next time you run `docker compose up`.
 
 ### Run services separately
 
@@ -68,6 +68,7 @@ The sign-in page also has one-click demo entry. Demo mode stores sample changes 
 - Faculty availability, weekly schedule blocks, and a student-facing profile preview.
 - Faculty-only cross-department collaboration requests and responses.
 - Admin account management, faculty verification, account activation controls, post moderation, and an admin-only shared profile cover setting.
+- Admins can upload a PNG, JPG, or WebP shared profile cover (up to 2 MB) and set its display width (320–2400 px) and height (100–500 px); image files persist in `campusbridge-media` and cover settings in PostgreSQL.
 - Role-specific sidebar navigation in a fixed-height, independently scrollable sidebar.
 
 ## Project structure

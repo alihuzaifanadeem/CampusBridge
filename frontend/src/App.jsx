@@ -1,13 +1,19 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './Layout.jsx'
-import { request, postJson, patchJson, putJson } from './api.js'
+import { request, postJson, patchJson, putForm } from './api.js'
 import { demoCollaborations, demoGuidance, demoPosts, demoUsers } from './demoData.js'
 import { AdminPage, CollaborationPage, CreatePostPage, DirectoryPage, FeedPage, FacultyPage, LoginPage, NotificationsPage, ProfilePage, RequestsPage, SavedPage, SchedulePage, SettingsPage } from './pages.jsx'
 
 const Context = createContext(null)
 export const useCampusBridge = () => useContext(Context)
 const restore = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) || fallback } catch { return fallback } }
+const fileToDataUrl = file => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(reader.result)
+  reader.onerror = () => reject(new Error('Unable to read the selected image.'))
+  reader.readAsDataURL(file)
+})
 
 function Protected({ children, allow, requireVerified = false }) {
   const { user } = useCampusBridge()
@@ -18,6 +24,7 @@ function Protected({ children, allow, requireVerified = false }) {
 }
 
 export default function App() {
+  const [demoCover] = useState(() => restore('cb.demo.profileCover', {}))
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(localStorage.getItem('cb.token'))
   const [posts, setPosts] = useState(() => restore('cb.demo.posts', demoPosts))
@@ -26,7 +33,10 @@ export default function App() {
   const [collaborations, setCollaborations] = useState(() => restore('cb.demo.collaborations', demoCollaborations))
   const [toast, setToast] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [profileCoverTheme, setProfileCoverTheme] = useState(() => localStorage.getItem('cb.demo.profileCoverTheme') || 'blue')
+  const [profileCoverTheme, setProfileCoverTheme] = useState(() => demoCover.theme || localStorage.getItem('cb.demo.profileCoverTheme') || 'blue')
+  const [profileCoverImageUrl, setProfileCoverImageUrl] = useState(() => demoCover.imageUrl || null)
+  const [profileCoverWidth, setProfileCoverWidth] = useState(() => Number(demoCover.width) || 1600)
+  const [profileCoverHeight, setProfileCoverHeight] = useState(() => Number(demoCover.height) || 177)
   const isLive = Boolean(token && token !== 'demo')
 
   const notify = (message, kind = 'success') => {
@@ -45,10 +55,21 @@ export default function App() {
 
   useEffect(() => {
     if (!isLive || !user) {
-      if (!isLive) setProfileCoverTheme(localStorage.getItem('cb.demo.profileCoverTheme') || 'blue')
+      if (!isLive) {
+        const savedCover = restore('cb.demo.profileCover', {})
+        setProfileCoverTheme(savedCover.theme || localStorage.getItem('cb.demo.profileCoverTheme') || 'blue')
+        setProfileCoverImageUrl(savedCover.imageUrl || null)
+        setProfileCoverWidth(Number(savedCover.width) || 1600)
+        setProfileCoverHeight(Number(savedCover.height) || 177)
+      }
       return
     }
-    request('/profile-cover', {}, token).then(data => setProfileCoverTheme(data.theme || 'blue')).catch(() => {})
+    request('/profile-cover', {}, token).then(data => {
+      setProfileCoverTheme(data.theme || 'blue')
+      setProfileCoverImageUrl(data.image_url || null)
+      setProfileCoverWidth(Number(data.width) || 1600)
+      setProfileCoverHeight(Number(data.height) || 177)
+    }).catch(() => {})
   }, [isLive, token, user?.id])
 
   useEffect(() => {
@@ -166,12 +187,21 @@ export default function App() {
     return updated
   }
 
-  const updateProfileCover = async theme => {
+  const updateProfileCover = async ({ theme, width, height, image, removeImage }) => {
     if (!['blue', 'violet', 'teal', 'sunset'].includes(theme)) throw new Error('Choose a supported profile background.')
     if (isLive) {
       try {
-        const updated = await putJson('/admin/profile-cover', { theme }, token)
+        const body = new FormData()
+        body.append('theme', theme)
+        body.append('width', String(width))
+        body.append('height', String(height))
+        body.append('remove_image', String(Boolean(removeImage)))
+        if (image) body.append('image', image)
+        const updated = await putForm('/admin/profile-cover', body, token)
         setProfileCoverTheme(updated.theme)
+        setProfileCoverImageUrl(updated.image_url || null)
+        setProfileCoverWidth(Number(updated.width) || 1600)
+        setProfileCoverHeight(Number(updated.height) || 177)
         notify('Shared profile background updated for all users.')
         return updated
       } catch (error) {
@@ -179,13 +209,19 @@ export default function App() {
         throw error
       }
     }
+    const imageUrl = image ? await fileToDataUrl(image) : removeImage ? null : profileCoverImageUrl
+    const updated = { theme, width: Number(width), height: Number(height), imageUrl }
+    localStorage.setItem('cb.demo.profileCover', JSON.stringify(updated))
     localStorage.setItem('cb.demo.profileCoverTheme', theme)
     setProfileCoverTheme(theme)
+    setProfileCoverImageUrl(imageUrl)
+    setProfileCoverWidth(updated.width)
+    setProfileCoverHeight(updated.height)
     notify('Shared profile background updated for this demo session.')
-    return { theme }
+    return updated
   }
 
-  const value = useMemo(() => ({ user, token, isLive, posts, setPosts, users, guidance, collaborations, toast, clearToast: () => setToast(null), notify, searchQuery, setSearchQuery, profileCoverTheme, updateProfileCover, login, logout, createPost, toggleLike, toggleSave, addComment, createGuidance, updateGuidance, createCollaboration, respondCollaboration, updateProfile }), [user, token, isLive, posts, users, guidance, collaborations, toast, searchQuery, profileCoverTheme])
+  const value = useMemo(() => ({ user, token, isLive, posts, setPosts, users, guidance, collaborations, toast, clearToast: () => setToast(null), notify, searchQuery, setSearchQuery, profileCoverTheme, profileCoverImageUrl, profileCoverWidth, profileCoverHeight, updateProfileCover, login, logout, createPost, toggleLike, toggleSave, addComment, createGuidance, updateGuidance, createCollaboration, respondCollaboration, updateProfile }), [user, token, isLive, posts, users, guidance, collaborations, toast, searchQuery, profileCoverTheme, profileCoverImageUrl, profileCoverWidth, profileCoverHeight, updateProfileCover])
 
   return <Context.Provider value={value}>
     <Routes>
