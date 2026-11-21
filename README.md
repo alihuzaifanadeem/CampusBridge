@@ -14,6 +14,16 @@ Open [http://localhost:5173](http://localhost:5173). The API is available at [ht
 
 The first API startup creates the PostgreSQL tables and inserts clearly marked demo records. The compose configuration is for local development; change the development database password, secret, CORS settings, and deployment configuration before hosting the service.
 
+### PostgreSQL data and schema
+
+Docker Compose runs PostgreSQL 16 in the `database` service. FastAPI connects to it at `database:5432` on Compose's private network. The database files are kept in the named Docker volume `campusbridge-data`, not in a source-code folder. SQLAlchemy models and the database connection are defined in `backend/app/main.py`; the API creates the tables at startup. To inspect the database, run:
+
+```sh
+docker compose exec database psql -U campusbridge -d campusbridge
+```
+
+`docker compose down` stops the containers and preserves the database volume. The database remains available the next time you run `docker compose up`.
+
 ### Run services separately
 
 Start PostgreSQL and set `DATABASE_URL` to a PostgreSQL connection string. Then, from `backend/`, create a Python virtual environment, install `requirements.txt`, and start the API:
