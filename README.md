@@ -67,7 +67,8 @@ The sign-in page also has one-click demo entry. Demo mode stores sample changes 
 - Student consultation requests and faculty approval, decline, and reschedule actions.
 - Faculty availability, weekly schedule blocks, and a student-facing profile preview.
 - Faculty-only cross-department collaboration requests and responses.
-- Admin account management, faculty verification, account activation controls, and post moderation.
+- Admin account management, faculty verification, account activation controls, post moderation, and an admin-only shared profile cover setting.
+- Role-specific sidebar navigation in a fixed-height, independently scrollable sidebar.
 
 ## Project structure
 

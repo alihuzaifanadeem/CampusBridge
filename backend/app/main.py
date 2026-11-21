@@ -27,6 +27,7 @@ from .database import (
     PostLike,
     SavedPost,
     SessionLocal,
+    SiteSetting,
     User,
     engine,
     get_db,
@@ -181,6 +182,10 @@ class CollaborationCreate(BaseModel):
 class AdminUserUpdate(BaseModel):
     verified: bool | None = None
     active: bool | None = None
+
+
+class ProfileCoverUpdate(BaseModel):
+    theme: Literal["blue", "violet", "teal", "sunset"]
 
 
 def user_dict(user: User) -> dict[str, Any]:
@@ -543,6 +548,30 @@ def admin_overview(db: Session = Depends(get_db), user: User = Depends(require_r
         "posts": db.scalar(select(func.count()).select_from(Post)) or 0,
         "pending_requests": db.scalar(select(func.count()).select_from(GuidanceRequest).where(GuidanceRequest.status == "pending")) or 0,
     }
+
+
+@app.get("/api/profile-cover")
+def get_profile_cover(db: Session = Depends(get_db)) -> dict[str, str]:
+    setting = db.get(SiteSetting, "profile_cover_theme")
+    theme = setting.value if setting and setting.value in {"blue", "violet", "teal", "sunset"} else "blue"
+    return {"theme": theme}
+
+
+@app.put("/api/admin/profile-cover")
+def update_profile_cover(
+    body: ProfileCoverUpdate,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_roles("admin", "system_admin")),
+) -> dict[str, str]:
+    setting = db.get(SiteSetting, "profile_cover_theme")
+    if setting is None:
+        setting = SiteSetting(key="profile_cover_theme", value=body.theme)
+        db.add(setting)
+    else:
+        setting.value = body.theme
+        setting.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"theme": setting.value}
 
 
 @app.get("/api/admin/users")

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './Layout.jsx'
-import { request, postJson, patchJson } from './api.js'
+import { request, postJson, patchJson, putJson } from './api.js'
 import { demoCollaborations, demoGuidance, demoPosts, demoUsers } from './demoData.js'
 import { AdminPage, CollaborationPage, CreatePostPage, DirectoryPage, FeedPage, FacultyPage, LoginPage, NotificationsPage, ProfilePage, RequestsPage, SavedPage, SchedulePage, SettingsPage } from './pages.jsx'
 
@@ -26,6 +26,7 @@ export default function App() {
   const [collaborations, setCollaborations] = useState(() => restore('cb.demo.collaborations', demoCollaborations))
   const [toast, setToast] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [profileCoverTheme, setProfileCoverTheme] = useState(() => localStorage.getItem('cb.demo.profileCoverTheme') || 'blue')
   const isLive = Boolean(token && token !== 'demo')
 
   const notify = (message, kind = 'success') => {
@@ -41,6 +42,14 @@ export default function App() {
       request('/auth/me', {}, token).then(setUser).catch(() => { localStorage.removeItem('cb.token'); localStorage.removeItem('cb.user'); setToken(null); setUser(null) })
     }
   }, [])
+
+  useEffect(() => {
+    if (!isLive || !user) {
+      if (!isLive) setProfileCoverTheme(localStorage.getItem('cb.demo.profileCoverTheme') || 'blue')
+      return
+    }
+    request('/profile-cover', {}, token).then(data => setProfileCoverTheme(data.theme || 'blue')).catch(() => {})
+  }, [isLive, token, user?.id])
 
   useEffect(() => {
     if (!user || !isLive) return
@@ -157,7 +166,26 @@ export default function App() {
     return updated
   }
 
-  const value = useMemo(() => ({ user, token, isLive, posts, setPosts, users, guidance, collaborations, toast, clearToast: () => setToast(null), notify, searchQuery, setSearchQuery, login, logout, createPost, toggleLike, toggleSave, addComment, createGuidance, updateGuidance, createCollaboration, respondCollaboration, updateProfile }), [user, token, isLive, posts, users, guidance, collaborations, toast, searchQuery])
+  const updateProfileCover = async theme => {
+    if (!['blue', 'violet', 'teal', 'sunset'].includes(theme)) throw new Error('Choose a supported profile background.')
+    if (isLive) {
+      try {
+        const updated = await putJson('/admin/profile-cover', { theme }, token)
+        setProfileCoverTheme(updated.theme)
+        notify('Shared profile background updated for all users.')
+        return updated
+      } catch (error) {
+        notify(error.message, 'error')
+        throw error
+      }
+    }
+    localStorage.setItem('cb.demo.profileCoverTheme', theme)
+    setProfileCoverTheme(theme)
+    notify('Shared profile background updated for this demo session.')
+    return { theme }
+  }
+
+  const value = useMemo(() => ({ user, token, isLive, posts, setPosts, users, guidance, collaborations, toast, clearToast: () => setToast(null), notify, searchQuery, setSearchQuery, profileCoverTheme, updateProfileCover, login, logout, createPost, toggleLike, toggleSave, addComment, createGuidance, updateGuidance, createCollaboration, respondCollaboration, updateProfile }), [user, token, isLive, posts, users, guidance, collaborations, toast, searchQuery, profileCoverTheme])
 
   return <Context.Provider value={value}>
     <Routes>

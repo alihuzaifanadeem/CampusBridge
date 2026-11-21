@@ -28,23 +28,26 @@ h1, h2, h3, h4, strong { font-family: Manrope, 'DM Sans', sans-serif; }
 
 .app-frame { min-height: 100vh; }
 .sidebar { width: 250px; position: fixed; inset: 0 auto 0 0; z-index: 40; display: flex; flex-direction: column; padding: 18px 14px 13px; background: #fff; border-right: 1px solid var(--line); }
-.brand-row { height: 43px; display: flex; align-items: center; gap: 9px; padding: 0 6px; color: #14223d; font-family: Manrope, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: -.4px; }
+.brand-row { height: 43px; flex: 0 0 43px; display: flex; align-items: center; gap: 9px; padding: 0 6px; color: #14223d; font-family: Manrope, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: -.4px; }
 .brand-light { font-weight: 600; }
 .campus-mark { display: inline-flex; align-items: center; justify-content: center; gap: 3px; flex: 0 0 auto; height: 34px; min-width: 34px; padding: 0 7px; border-radius: 11px; background: linear-gradient(145deg, #367bff, #1551dc); color: white; box-shadow: 0 5px 12px rgba(34, 91, 232, .22); }
 .campus-mark-small { width: 28px; height: 28px; min-width: 28px; padding: 0; border-radius: 9px; }
-.main-nav { display: flex; flex-direction: column; gap: 3px; margin-top: 32px; }
+.main-nav { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; overflow-y: auto; overscroll-behavior: contain; margin-top: 22px; padding-right: 3px; scrollbar-color: #d5deec transparent; scrollbar-width: thin; }
+.main-nav::-webkit-scrollbar { width: 5px; }
+.main-nav::-webkit-scrollbar-thumb { border-radius: 99px; background: #d5deec; }
+.main-nav::-webkit-scrollbar-track { background: transparent; }
 .nav-label { padding: 0 11px; margin-bottom: 7px; color: #a1abba; font-size: 10px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
-.nav-item { position: relative; display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 9px; color: #59677d; font-size: 12px; font-weight: 600; transition: color .15s, background .15s; }
+.nav-item { position: relative; flex: 0 0 auto; display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 9px; color: #59677d; font-size: 12px; font-weight: 600; transition: color .15s, background .15s; }
 .nav-item svg { color: #8a96a9; }
 .nav-item:hover { background: #f5f8ff; color: #225be8; }
 .nav-item.nav-active { background: #eff5ff; color: #1555e5; }
 .nav-item.nav-active svg { color: #225be8; }
 .nav-dot { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: #2a66ee; }
-.sidebar-note { margin: auto 3px 14px; padding: 14px 13px 13px; border: 1px solid #e7edf7; border-radius: 12px; background: linear-gradient(135deg, #f8fbff, #f1f6ff); }
+.sidebar-note { flex: 0 0 auto; margin: 12px 3px 10px; padding: 14px 13px 13px; border: 1px solid #e7edf7; border-radius: 12px; background: linear-gradient(135deg, #f8fbff, #f1f6ff); }
 .note-icon { width: 28px; height: 28px; display: grid; place-items: center; margin-bottom: 9px; border-radius: 9px; background: #e5efff; color: #245ee5; }
 .sidebar-note strong { color: #22334f; font-size: 11px; }
 .sidebar-note p { margin: 5px 0 0; color: #7d8ba1; font-size: 10px; line-height: 1.55; }
-.account-button { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 49px; padding: 7px 5px; border: 0; border-top: 1px solid #eef1f5; background: #fff; color: var(--ink); text-align: left; }
+.account-button { flex: 0 0 auto; display: flex; align-items: center; gap: 9px; width: 100%; min-height: 49px; padding: 7px 5px; border: 0; border-top: 1px solid #eef1f5; background: #fff; color: var(--ink); text-align: left; }
 .account-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .account-copy strong { overflow: hidden; color: #33415a; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .account-copy small { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
@@ -358,6 +361,10 @@ kbd { flex: 0 0 auto; padding: 2px 5px; border: 1px solid #e6eaf1; border-radius
 .profile-cover { position: relative; overflow: hidden; height: 177px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 16px 18px; border: 1px solid #d9e2f3; border-radius: 14px 14px 0 0; background: linear-gradient(115deg, #173770, #2c69b4 53%, #4597c4); color: rgba(255,255,255,.75); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .cover-grid { position: absolute; inset: 0; opacity: .3; background-image: linear-gradient(30deg, transparent 48%, rgba(255,255,255,.17) 49%, transparent 50%), linear-gradient(120deg, transparent 48%, rgba(255,255,255,.13) 49%, transparent 50%); background-size: 52px 52px, 74px 74px; }
 .profile-cover > span { position: relative; }
+.profile-cover-blue { background: linear-gradient(115deg, #173770, #2c69b4 53%, #4597c4); }
+.profile-cover-violet { background: linear-gradient(115deg, #39246f, #6950b5 53%, #a06ac5); }
+.profile-cover-teal { background: linear-gradient(115deg, #075969, #148f9b 53%, #57b7a5); }
+.profile-cover-sunset { background: linear-gradient(115deg, #803b55, #c05e66 53%, #e99b62); }
 .profile-overlap { position: relative; display: flex; align-items: flex-start; gap: 13px; padding: 0 19px 16px; margin-top: -39px; }
 .profile-overlap > .avatar { border: 3px solid #fff; }
 .profile-identity { min-width: 0; flex: 1; padding-top: 43px; }

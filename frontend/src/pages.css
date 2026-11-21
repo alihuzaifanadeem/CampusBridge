@@ -156,6 +156,18 @@
 /* Admin workspace */
 .admin-panel { padding: 0; overflow: hidden; }.admin-tabs { padding: 0 16px; }.admin-tabs button { font-size: 9px; }
 .admin-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 17px; }.admin-toolbar h2 { margin: 0 0 4px; color: #2e3e58; font-size: 12px; }.admin-toolbar p { margin: 0; color: #8793a5; font-size: 8px; }
+.profile-cover-admin-panel { margin-top: 14px; }
+.profile-cover-admin-panel > .admin-toolbar { padding: 0 0 13px; }
+.cover-theme-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(270px, .9fr); align-items: start; gap: 14px; }
+.cover-theme-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cover-theme-choice { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid #e4eaf2; border-radius: 9px; background: #fff; color: #52627b; text-align: left; }
+.cover-theme-choice:hover { border-color: #b9ccef; background: #f8faff; }
+.cover-theme-choice.cover-theme-selected { border-color: #2863e8; background: #f4f8ff; box-shadow: 0 0 0 2px rgba(40, 99, 232, .08); }
+.cover-theme-swatch { display: block; flex: 0 0 54px; height: 34px; border-radius: 6px; }
+.cover-theme-label { overflow: hidden; font-size: 9px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.cover-theme-preview-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 9px; }
+.admin-cover-preview { width: 100%; height: 100px; padding: 12px; border: 0; border-radius: 10px; font-size: 8px; }
+@media (max-width: 760px) { .cover-theme-layout { grid-template-columns: 1fr; }.cover-theme-preview-wrap { align-items: stretch; }.cover-theme-preview-wrap > .button { align-self: flex-end; } }
 .admin-search { width: min(235px, 40%); min-height: 33px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid #e4e9f0; border-radius: 7px; color: #8b97a8; }.admin-search input { font-size: 8px; }
 .table-scroll { overflow-x: auto; }
 .admin-table { width: 100%; border-collapse: collapse; text-align: left; }

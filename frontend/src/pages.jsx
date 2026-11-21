@@ -8,6 +8,7 @@ import { useCampusBridge } from './App.jsx'
 
 const categories = ['Academic Help', 'Faculty Guidance', 'Alumni Insights', 'Research Discussions', 'Final Year Project', 'Career Advice', 'Study Resources']
 const expertiseOptions = ['Artificial Intelligence', 'Machine Learning', 'Deep Learning', 'Data Science', 'Software Architecture', 'Cyber Security', 'Cloud Computing', 'Database Systems']
+const profileCoverOptions = [{ theme: 'blue', label: 'Campus blue' }, { theme: 'violet', label: 'Violet' }, { theme: 'teal', label: 'Ocean teal' }, { theme: 'sunset', label: 'Sunset' }]
 const formatDate = value => {
   if (!value) return 'Recently'
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000))
@@ -154,14 +155,14 @@ export function DirectoryPage() {
 
 export function FacultyPage() {
   const { id } = useParams()
-  const { users, createGuidance, user, notify } = useCampusBridge()
+  const { users, createGuidance, user, notify, profileCoverTheme } = useCampusBridge()
   const faculty = users.find(person => String(person.id) === id) || users.find(person => person.role === 'faculty')
   const [requestOpen, setRequestOpen] = useState(false)
   const [form, setForm] = useState({ topic: '', message: '', requested_slot: 'Flexible' })
   if (!faculty) return <div className="empty-state"><UsersRound size={28} /><strong>Faculty profile unavailable</strong><Link to="/directory">Return to the directory</Link></div>
   const submit = async event => { event.preventDefault(); try { await createGuidance({ ...form, faculty_id: faculty.id }); setRequestOpen(false); setForm({ topic: '', message: '', requested_slot: 'Flexible' }) } catch {} }
   const isFaculty = user.role === 'faculty'
-  return <div className="profile-detail-page"><Link to="/directory" className="back-link"><ArrowLeft size={16} />Back to directory</Link><div className="faculty-hero"><div className="faculty-hero-cover"><span>Faculty profile</span></div><div className="faculty-hero-main"><Avatar user={faculty} size="xl" /><div className="faculty-hero-copy"><div className="faculty-hero-name"><h1>{faculty.full_name}</h1>{faculty.verified && <span className="verified-chip"><BadgeCheck size={14} />Verified faculty</span>}</div><p>{faculty.designation || 'Faculty member'} · {faculty.department}</p><div className="tag-row">{faculty.expertise?.map(item => <span className="topic-tag" key={item}>{item}</span>)}</div></div><StatusPill status={faculty.availability} /></div></div>
+  return <div className="profile-detail-page"><Link to="/directory" className="back-link"><ArrowLeft size={16} />Back to directory</Link><div className="faculty-hero"><div className={`faculty-hero-cover profile-cover-${profileCoverTheme}`}><span>Faculty profile</span></div><div className="faculty-hero-main"><Avatar user={faculty} size="xl" /><div className="faculty-hero-copy"><div className="faculty-hero-name"><h1>{faculty.full_name}</h1>{faculty.verified && <span className="verified-chip"><BadgeCheck size={14} />Verified faculty</span>}</div><p>{faculty.designation || 'Faculty member'} · {faculty.department}</p><div className="tag-row">{faculty.expertise?.map(item => <span className="topic-tag" key={item}>{item}</span>)}</div></div><StatusPill status={faculty.availability} /></div></div>
     <div className="faculty-profile-grid"><div className="profile-main-column"><section className="panel profile-about"><SectionTitle icon={GraduationCap} title="Academic profile" /><p>{faculty.bio || 'Faculty profile information will be added by the member.'}</p><div className="credential-grid"><div><span>Qualifications</span><strong>{faculty.qualifications || 'Not provided'}</strong></div><div><span>Teaching experience</span><strong>{faculty.years_experience ? `${faculty.years_experience} years` : 'Not provided'}</strong></div><div><span>Department</span><strong>{faculty.department}</strong></div><div><span>Campus</span><strong>{faculty.campus}</strong></div></div></section>
       <section className="panel"><SectionTitle icon={CalendarDays} title="Weekly semester schedule" /><div className="schedule-list">{(faculty.schedule || []).length ? faculty.schedule.map((slot, index) => <div className="schedule-row" key={`${slot.day}-${index}`}><span className="schedule-day">{slot.day}</span><span className={`schedule-kind schedule-kind-${slot.kind || 'consultation'}`}><i />{slot.label}</span><strong>{slot.time}</strong></div>) : <p className="muted-small">This faculty member has not published a schedule yet.</p>}</div></section>
       <section className="panel"><SectionTitle icon={FlaskConical} title="Research & expertise" /><div className="research-grid">{(faculty.expertise || []).map(item => <div className="research-card" key={item}><span className="research-symbol"><FlaskConical size={16} /></span><strong>{item}</strong><small>Research interest</small></div>)}</div></section></div>
@@ -200,12 +201,12 @@ export function CreatePostPage() {
 }
 
 export function ProfilePage() {
-  const { user, posts, users } = useCampusBridge()
+  const { user, posts, users, profileCoverTheme } = useCampusBridge()
   const [activityTab, setActivityTab] = useState('My posted threads')
   const mine = posts.filter(post => post.author?.id === user.id)
   const shownPosts = activityTab === 'Saved discussions' ? posts.filter(post => post.saved) : activityTab === 'Research contributions' ? mine.filter(post => /research/i.test(post.category || '')) : activityTab === 'Activity history' ? posts.slice(0, 4) : mine
   const subtitle = user.role === 'student' ? `${user.program || 'Student'} · ${user.semester || ''}` : user.role === 'alumni' ? `Alumni · Class of ${user.passing_year || '2024'}` : user.designation || labelRole(user.role)
-  return <div className="profile-page"><div className="profile-cover"><div className="cover-grid" /><span>CampusBridge · Your academic journey</span></div><div className="profile-overlap"><Avatar user={user} size="xxl" /><div className="profile-identity"><div className="author-name-row"><h1>{user.full_name}</h1>{user.verified && user.role === 'faculty' && <BadgeCheck size={18} className="verified-icon" />}</div><p>{subtitle}</p><p className="profile-bio">{user.bio || 'Add a short introduction to help your university community connect with you.'}</p></div><Link className="button button-primary" to="/settings"><Settings size={15} />Edit profile</Link></div>
+  return <div className="profile-page"><div className={`profile-cover profile-cover-${profileCoverTheme}`}><div className="cover-grid" /><span>CampusBridge · Your academic journey</span></div><div className="profile-overlap"><Avatar user={user} size="xxl" /><div className="profile-identity"><div className="author-name-row"><h1>{user.full_name}</h1>{user.verified && user.role === 'faculty' && <BadgeCheck size={18} className="verified-icon" />}</div><p>{subtitle}</p><p className="profile-bio">{user.bio || 'Add a short introduction to help your university community connect with you.'}</p></div><Link className="button button-primary" to="/settings"><Settings size={15} />Edit profile</Link></div>
     <div className="profile-content-grid"><div className="profile-main-column"><section className="panel"><SectionTitle icon={GraduationCap} title={user.role === 'faculty' ? 'Professional information' : 'Academic information'} /><div className="credential-grid">{user.role === 'student' ? <><div><span>Degree program</span><strong>{user.program || 'BS Computer Science'}</strong></div><div><span>Department</span><strong>{user.department || 'Computer Science'}</strong></div><div><span>Current semester</span><strong>{user.semester || 'Semester 7'}</strong></div><div><span>Campus</span><strong>{user.campus}</strong></div><div><span>Enrollment year</span><strong>2023</strong></div><div><span>Expected graduation</span><strong>2027</strong></div></> : <><div><span>Role</span><strong>{labelRole(user.role)}</strong></div><div><span>Department</span><strong>{user.department || 'Not provided'}</strong></div><div><span>Campus</span><strong>{user.campus}</strong></div><div><span>Academic standing</span><strong>{user.role === 'faculty' ? user.qualifications || 'Faculty member' : `Class of ${user.passing_year || '2024'}`}</strong></div></>}</div>
       {user.role === 'student' && <><div className="tag-row interest-tags">{(user.expertise || []).map(item => <span className="topic-tag" key={item}>{item}</span>)}</div><div className="progress-section"><div><strong>Academic progress</strong><span>Sample profile values</span></div><div className="progress-metrics"><div><strong>3.72</strong><small>Current CGPA</small></div><div><strong>120</strong><small>Credits completed</small></div><div><strong>12</strong><small>Credits remaining</small></div><div><strong>91%</strong><small>Degree progress</small></div></div><div className="progress-track"><i /></div></div></>}</section>
       <section className="panel"><SectionTitle icon={Activity} title="Activity statistics" aside={<span className="sample-label">Sample values</span>} /><div className="profile-stat-grid"><div><strong>{mine.length}</strong><small>Posts created</small></div><div><strong>89</strong><small>Discussions</small></div><div><strong>15</strong><small>Faculty interactions</small></div><div><strong>7</strong><small>Collaborations</small></div><div><strong>32</strong><small>Resources shared</small></div><div><strong>56</strong><small>Saved posts</small></div></div></section>
@@ -305,11 +306,13 @@ export function CollaborationPage() {
 }
 
 export function AdminPage() {
-  const { user, token, isLive, users, posts, setPosts, setUsers, notify } = useCampusBridge()
+  const { user, token, isLive, users, posts, setPosts, setUsers, notify, profileCoverTheme, updateProfileCover } = useCampusBridge()
   const [search, setSearch] = useState('')
   const [overview, setOverview] = useState({ users: users.length, students: users.filter(item => item.role === 'student').length, faculty: users.filter(item => item.role === 'faculty').length, pending_faculty: users.filter(item => item.role === 'faculty' && !item.verified).length, posts: posts.length, pending_requests: 1 })
   const [adminUsers, setAdminUsers] = useState(users)
   const [tab, setTab] = useState('Users')
+  const [coverDraftTheme, setCoverDraftTheme] = useState(profileCoverTheme)
+  const [coverSaving, setCoverSaving] = useState(false)
   const loadAdmin = async () => {
     if (!isLive) return
     try { const [stats, records] = await Promise.all([request('/admin/overview', {}, token), request(`/admin/users?q=${encodeURIComponent(search)}`, {}, token)]); setOverview(stats); setAdminUsers(records) } catch (error) { notify(error.message, 'error') }
@@ -322,11 +325,29 @@ export function AdminPage() {
     if (isLive) { try { await request(`/admin/posts/${post.id}`, { method: 'DELETE' }, token); setPosts(items => items.filter(item => item.id !== post.id)); notify('Post removed.') } catch (error) { notify(error.message, 'error') }; return }
     setPosts(items => items.filter(item => item.id !== post.id)); notify('Post removed from demo feed.')
   }
+  const saveProfileCover = async () => {
+    if (coverDraftTheme === profileCoverTheme) return
+    setCoverSaving(true)
+    try { await updateProfileCover(coverDraftTheme) } catch {} finally { setCoverSaving(false) }
+  }
+  useEffect(() => setCoverDraftTheme(profileCoverTheme), [profileCoverTheme])
   useEffect(() => { if (isLive) loadAdmin(); else { setAdminUsers(users); setOverview({ users: users.length, students: users.filter(item => item.role === 'student').length, faculty: users.filter(item => item.role === 'faculty').length, pending_faculty: users.filter(item => item.role === 'faculty' && !item.verified).length, posts: posts.length, pending_requests: 1 }) } }, [isLive, token])
   return <div className="admin-page"><PageHeading eyebrow="Platform management" title={user.role === 'system_admin' ? 'System administration' : 'Admin console'} description="Review accounts, verify faculty profiles, and moderate academic content." action={<button className="button button-secondary" onClick={loadAdmin}><Activity size={15} />Refresh overview</button>} />
     <div className="admin-metrics"><Metric icon={UsersRound} value={overview.users} label="Total accounts" tone="blue" /><Metric icon={GraduationCap} value={overview.students} label="Students" tone="violet" /><Metric icon={BriefcaseBusiness} value={overview.faculty} label="Faculty" tone="green" /><Metric icon={Clock3} value={overview.pending_faculty} label="Faculty pending review" tone="amber" /></div>
     <section className="panel admin-panel"><div className="admin-tabs">{['Users', 'Content moderation'].map(item => <button key={item} className={tab === item ? 'profile-tab-active' : ''} onClick={() => setTab(item)}>{item}</button>)}</div>
       {tab === 'Users' ? <><div className="admin-toolbar"><div><h2>Manage university accounts</h2><p>Faculty profiles must be verified before they appear in the public directory.</p></div><label className="admin-search"><Search size={15} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, role…" onKeyDown={e => e.key === 'Enter' && loadAdmin()} /></label></div><div className="table-scroll"><table className="admin-table"><thead><tr><th>Member</th><th>Role</th><th>Campus / department</th><th>Status</th><th>Actions</th></tr></thead><tbody>{adminUsers.filter(person => !search || `${person.full_name} ${person.email} ${person.role}`.toLowerCase().includes(search.toLowerCase())).map(person => <tr key={person.id}><td><div className="table-user"><Avatar user={person} size="xs" /><span><strong>{person.full_name}</strong><small>{person.email}</small></span></div></td><td><RoleBadge user={person} /></td><td>{person.department || '—'}<small className="table-subtext">{person.campus}</small></td><td><span className={`admin-status ${person.active === false ? 'admin-disabled' : person.role === 'faculty' && !person.verified ? 'admin-pending' : 'admin-active'}`}><i />{person.active === false ? 'Inactive' : person.role === 'faculty' && !person.verified ? 'Pending verification' : 'Active'}</span></td><td><div className="table-actions">{person.role === 'faculty' && <button className="text-button" onClick={() => updateAdminUser(person, { verified: !person.verified })}>{person.verified ? 'Unverify' : 'Verify'}</button>}{person.id !== user.id && <button className="text-button text-danger" onClick={() => updateAdminUser(person, { active: person.active === false })}>{person.active === false ? 'Reactivate' : 'Deactivate'}</button>}</div></td></tr>)}</tbody></table></div>{!adminUsers.length && <div className="empty-state">No accounts found.</div>}</> : <><div className="admin-toolbar"><div><h2>Moderate academic posts</h2><p>Remove content that violates university community guidelines.</p></div><span className="muted-small">{posts.length} posts in feed</span></div><div className="moderation-list">{posts.map(post => <div className="moderation-row" key={post.id}><Avatar user={post.author} size="sm" /><div><strong>{post.title}</strong><small>{post.author?.full_name} · {formatDate(post.created_at)}</small><p>{post.content}</p></div><button className="button button-danger-soft button-small" onClick={() => removePost(post)}><X size={13} />Remove</button></div>)}{!posts.length && <div className="empty-state">There are no posts to review.</div>}</div></>}
+    </section>
+    <section className="panel profile-cover-admin-panel">
+      <div className="admin-toolbar"><div><h2>Shared profile background</h2><p>Choose the same cover for student, faculty, and alumni profiles. Only admins can change it.</p></div></div>
+      <div className="cover-theme-layout">
+        <div className="cover-theme-grid" role="group" aria-label="Choose a shared profile background">
+          {profileCoverOptions.map(({ theme, label }) => <button type="button" key={theme} className={`cover-theme-choice ${coverDraftTheme === theme ? 'cover-theme-selected' : ''}`} aria-pressed={coverDraftTheme === theme} onClick={() => setCoverDraftTheme(theme)}><span className={`cover-theme-swatch profile-cover-${theme}`} /><span className="cover-theme-label">{label}</span></button>)}
+        </div>
+        <div className="cover-theme-preview-wrap">
+          <div className={`profile-cover admin-cover-preview profile-cover-${coverDraftTheme}`}><div className="cover-grid" /><span>CampusBridge · Your academic journey</span></div>
+          <button className="button button-primary" onClick={saveProfileCover} disabled={coverSaving || coverDraftTheme === profileCoverTheme}><Check size={15} />{coverSaving ? 'Saving…' : 'Save shared background'}</button>
+        </div>
+      </div>
     </section>
   </div>
 }

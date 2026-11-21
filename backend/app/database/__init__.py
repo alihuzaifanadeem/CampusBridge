@@ -7,6 +7,7 @@ from .models import (
     Post,
     PostLike,
     SavedPost,
+    SiteSetting,
     User,
 )
 
@@ -21,6 +22,7 @@ __all__ = [
     "Comment",
     "PostLike",
     "SavedPost",
+    "SiteSetting",
     "GuidanceRequest",
     "CollaborationRequest",
     "CollaborationResponse",
