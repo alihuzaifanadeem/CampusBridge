@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Layout from './Layout.jsx'
 import { request, postJson, patchJson, putForm } from './api.js'
 import { demoCollaborations, demoGuidance, demoPosts, demoUsers } from './demoData.js'
-import { AdminPage, CollaborationPage, CreatePostPage, DirectoryPage, FeedPage, FacultyPage, LoginPage, NotificationsPage, ProfilePage, RequestsPage, SavedPage, SchedulePage, SettingsPage } from './pages.jsx'
+import { AdminPage, CollaborationPage, CreatePostPage, DirectoryPage, FeedPage, FacultyPage, LoginPage, NotificationsPage, ProfilePage, PublicProfilePage, RequestsPage, SavedPage, SchedulePage, SettingsPage } from './pages.jsx'
 
 const Context = createContext(null)
 export const useCampusBridge = () => useContext(Context)
@@ -17,7 +17,8 @@ const fileToDataUrl = file => new Promise((resolve, reject) => {
 
 function Protected({ children, allow, requireVerified = false }) {
   const { user } = useCampusBridge()
-  if (!user) return <Navigate to="/login" replace />
+  const location = useLocation()
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />
   if (allow && !allow.includes(user.role)) return <Navigate to="/" replace />
   if (requireVerified && user.role === 'faculty' && !user.verified) return <Navigate to="/schedule" replace />
   return children || <Layout />
@@ -268,12 +269,13 @@ export default function App() {
 
   return <Context.Provider value={value}>
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route element={<Protected><Layout /></Protected>}>
         <Route index element={<FeedPage />} />
         <Route path="directory" element={<DirectoryPage />} />
         <Route path="create" element={<CreatePostPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="users/:id" element={<PublicProfilePage />} />
         <Route path="faculty/:id" element={<FacultyPage />} />
         <Route path="requests" element={<RequestsPage />} />
         <Route path="saved" element={<SavedPage />} />

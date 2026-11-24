@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Activity, ArrowDownUp, ArrowLeft, ArrowRight, BadgeCheck, Bell, Bookmark, BookOpen, BriefcaseBusiness, CalendarDays, Camera, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clock3, Eye, FileText, Filter, FlaskConical, GraduationCap, Heart, Link2, MapPin, MessageCircle, MoreHorizontal, Plus, RefreshCw, Search, Send, Settings, ShieldCheck, SlidersHorizontal, Sparkles, ThumbsUp, UsersRound, X } from 'lucide-react'
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Activity, ArrowDownUp, ArrowLeft, ArrowRight, BadgeCheck, Bell, Bookmark, BookOpen, BriefcaseBusiness, CalendarDays, Camera, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clock3, Copy, Eye, FileText, Filter, FlaskConical, GraduationCap, Heart, Link2, Mail, MapPin, MessageCircle, MoreHorizontal, Plus, RefreshCw, Search, Send, Settings, Share2, ShieldCheck, SlidersHorizontal, Sparkles, ThumbsUp, UsersRound, X } from 'lucide-react'
 import { request, postJson, postForm, patchJson } from './api.js'
 import { campuses, demoAccounts, demoEvents } from './demoData.js'
 import { Avatar, CampusMark, EventIcon, FacultyIcon, Metric, RoleBadge, SectionTitle, StatusPill, Toast, initials } from './components.jsx'
@@ -80,7 +80,8 @@ function SignupRequestsPanel({ isLive, token, notify, onApproved }) {
 }
 
 export function LoginPage() {
-  const { login, notify, toast, clearToast } = useCampusBridge()
+  const { user, login, notify, toast, clearToast } = useCampusBridge()
+  const location = useLocation()
   const [register, setRegister] = useState(false)
   const [registrationMessage, setRegistrationMessage] = useState('')
   const [authError, setAuthError] = useState('')
@@ -150,6 +151,7 @@ export function LoginPage() {
       }
     } finally { setLoading(false) }
   }
+  if (user) return <Navigate to={location.state?.from || '/'} replace />
   return <><div className="login-screen">
     <section className="login-story">
       <div className="login-brand"><CampusMark /><strong>CampusBridge</strong></div>
@@ -183,16 +185,52 @@ export function LoginPage() {
 function PostCard({ post, compact = false }) {
   const { toggleLike, toggleSave, addComment, user, notify } = useCampusBridge()
   const [showComments, setShowComments] = useState(false)
+  const [showShare, setShowShare] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
   const [comment, setComment] = useState('')
+  const shareUrl = new URL('/', window.location.origin)
+  shareUrl.searchParams.set('post', post.id)
+  const shareLink = shareUrl.toString()
+  const shareText = `${post.title} · CampusBridge`
+  const authorHref = post.author?.id ? (String(post.author.id) === String(user?.id) ? '/profile' : `/users/${post.author.id}`) : null
+  useEffect(() => {
+    if (!showShare) return
+    const onKeyDown = event => { if (event.key === 'Escape') setShowShare(false) }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [showShare])
   const submitComment = async event => { event.preventDefault(); if (!comment.trim()) return; await addComment(post.id, comment.trim()); setComment('') }
-  const sharePost = () => { if (!navigator.clipboard?.writeText) return notify('Copying links is not available in this browser.', 'info'); navigator.clipboard.writeText(`${window.location.origin}/#post-${post.id}`).then(() => notify('Discussion link copied.')).catch(() => notify('Could not copy the discussion link.', 'error')) }
-  return <article className={`post-card ${compact ? 'post-card-compact' : ''}`}>
-    <div className="post-author-row"><Avatar user={post.author} /><div className="post-author-copy"><div className="author-name-row"><strong>{post.author?.full_name}</strong><RoleBadge user={post.author} /></div><div className="post-meta"><span>{formatDate(post.created_at)}</span><i /> <span>{post.campus || post.author?.campus}</span></div></div><button className={`icon-button save-button ${post.saved ? 'is-saved' : ''}`} onClick={() => toggleSave(post.id)} aria-label={post.saved ? 'Remove saved post' : 'Save post'}><Bookmark size={18} fill={post.saved ? 'currentColor' : 'none'} /></button></div>
+  const copyShareLink = async () => {
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(shareLink)
+      else {
+        const input = document.createElement('textarea')
+        input.value = shareLink
+        input.style.position = 'fixed'
+        input.style.opacity = '0'
+        document.body.appendChild(input)
+        input.select()
+        const copied = document.execCommand('copy')
+        input.remove()
+        if (!copied) throw new Error('Copy is unavailable')
+      }
+      setCopiedLink(true)
+      notify('Discussion link copied.')
+      window.setTimeout(() => setCopiedLink(false), 2200)
+    } catch { notify('Could not copy the discussion link.', 'error') }
+  }
+  const shareWithDevice = () => {
+    if (navigator.share) navigator.share({ title: shareText, text: shareText, url: shareLink }).catch(() => {})
+    else window.location.href = `mailto:?subject=${encodeURIComponent(shareText)}&body=${encodeURIComponent(shareLink)}`
+  }
+  return <article id={`post-${post.id}`} className={`post-card ${compact ? 'post-card-compact' : ''}`}>
+    <div className="post-author-row">{authorHref ? <Link to={authorHref} className="post-author-link" aria-label={`View ${post.author?.full_name || 'author'} profile`}><Avatar user={post.author} /><span className="post-author-copy"><span className="author-name-row"><strong>{post.author?.full_name}</strong><RoleBadge user={post.author} /></span><span className="post-meta"><span>{formatDate(post.created_at)}</span><i /> <span>{post.campus || post.author?.campus}</span></span></span></Link> : <><Avatar user={post.author} /><div className="post-author-copy"><div className="author-name-row"><strong>{post.author?.full_name}</strong><RoleBadge user={post.author} /></div><div className="post-meta"><span>{formatDate(post.created_at)}</span><i /> <span>{post.campus || post.author?.campus}</span></div></div></>}<button className={`icon-button save-button ${post.saved ? 'is-saved' : ''}`} onClick={() => toggleSave(post.id)} aria-label={post.saved ? 'Remove saved post' : 'Save post'}><Bookmark size={18} fill={post.saved ? 'currentColor' : 'none'} /></button></div>
     <h3 className="post-title">{post.title}</h3><p className="post-content">{post.content}</p>
     {!!post.tags?.length && <div className="tag-row">{post.tags.map(tag => <span className="topic-tag" key={tag}>#{tag.replace(/^#/, '')}</span>)}</div>}
     {!!post.resources?.length && <div className="post-resources">{post.resources.map(resource => <a key={resource} href={resource} target="_blank" rel="noreferrer"><Link2 size={13} />{resource.replace(/^https?:\/\//, '').slice(0, 38)}</a>)}</div>}
-    <div className="post-actions"><button className={post.liked ? 'action-liked' : ''} onClick={() => toggleLike(post.id)}><ThumbsUp size={16} />{post.like_count || 0}</button><button onClick={() => setShowComments(!showComments)}><MessageCircle size={16} />{post.comment_count || post.comments?.length || 0}</button><button onClick={sharePost}><Link2 size={16} /><span className="action-long">Share</span></button><span className="post-views"><Eye size={16} />{post.views || 245} views</span><button className="button button-primary button-small discussion-button" onClick={() => setShowComments(!showComments)}>{showComments ? 'Hide discussion' : 'Join discussion'}</button></div>
+    <div className="post-actions"><button className={post.liked ? 'action-liked' : ''} onClick={() => toggleLike(post.id)}><ThumbsUp size={16} />{post.like_count || 0}</button><button onClick={() => setShowComments(!showComments)}><MessageCircle size={16} />{post.comment_count || post.comments?.length || 0}</button><button onClick={() => setShowShare(true)}><Share2 size={16} /><span className="action-long">Share</span></button><span className="post-views"><Eye size={16} />{post.views || 245} views</span><button className="button button-primary button-small discussion-button" onClick={() => setShowComments(!showComments)}>{showComments ? 'Hide discussion' : 'Join discussion'}</button></div>
     {showComments && <div className="comments-panel"><div className="comments-list">{(post.comments || []).map(item => <div className="comment-row" key={item.id}><Avatar user={item.author} size="xs" /><div><strong>{item.author?.full_name}</strong><RoleBadge user={item.author} /><p>{item.content}</p></div></div>)}{!post.comments?.length && <p className="muted-small">Start the academic discussion with a thoughtful comment.</p>}</div><form className="comment-form" onSubmit={submitComment}><Avatar user={user} size="xs" /><input value={comment} onChange={e => setComment(e.target.value)} placeholder="Add a helpful comment…" maxLength={500} /><button aria-label="Send comment" className="icon-button"><Send size={16} /></button></form></div>}
+    {showShare && <div className="share-modal-backdrop" onMouseDown={event => event.target === event.currentTarget && setShowShare(false)}><section className="share-modal" role="dialog" aria-modal="true" aria-labelledby={`share-title-${post.id}`}><div className="share-modal-heading"><div><span className="eyebrow">CampusBridge discussion</span><h2 id={`share-title-${post.id}`}>Share this post</h2><p>{post.title}</p></div><button type="button" className="icon-button" onClick={() => setShowShare(false)} aria-label="Close share dialog"><X size={18} /></button></div><div className="share-options"><a className="share-option" href={`https://wa.me/?text=${encodeURIComponent(`${shareText}\n${shareLink}`)}`} target="_blank" rel="noreferrer"><span className="share-option-icon share-whatsapp"><MessageCircle size={23} /></span><span>WhatsApp</span></a><a className="share-option" href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareLink)}`} target="_blank" rel="noreferrer"><span className="share-option-icon share-facebook">f</span><span>Facebook</span></a><a className="share-option" href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(shareText)}`} target="_blank" rel="noreferrer"><span className="share-option-icon share-x">X</span><span>Post on X</span></a><button type="button" className="share-option" onClick={shareWithDevice}><span className="share-option-icon share-device"><Share2 size={21} /></span><span>More options</span></button><a className="share-option" href={`mailto:?subject=${encodeURIComponent(shareText)}&body=${encodeURIComponent(shareLink)}`}><span className="share-option-icon share-email"><Mail size={21} /></span><span>Email</span></a></div><div className="share-link-label">Post link</div><div className="share-link-field"><input aria-label="Post link" readOnly value={shareLink} onFocus={event => event.target.select()} /><button type="button" className="button button-primary" onClick={copyShareLink}>{copiedLink ? <Check size={16} /> : <Copy size={16} />}{copiedLink ? 'Copied' : 'Copy link'}</button></div><p className="share-dialog-note">People may need to sign in to view this university discussion.</p></section></div>}
   </article>
 }
 
@@ -209,12 +247,25 @@ function FeedAside() {
 
 export function FeedPage() {
   const { posts, searchQuery, users, refreshFeed, feedRefreshing } = useCampusBridge()
+  const location = useLocation()
+  const postToOpen = new URLSearchParams(location.search).get('post')
   const [campus, setCampus] = useState('All Campuses')
   const [category, setCategory] = useState('All posts')
   const [sortMode, setSortMode] = useState('Latest')
   const [sortMenu, setSortMenu] = useState(false)
   const handleRefresh = () => { void refreshFeed() }
   const visible = useMemo(() => { const matches = posts.filter(post => (campus === 'All Campuses' || post.campus === campus || post.campus === 'All Campuses') && (category === 'All posts' || post.category?.toLowerCase().includes(category.toLowerCase())) && (!searchQuery || `${post.title} ${post.content} ${(post.tags || []).join(' ')}`.toLowerCase().includes(searchQuery.toLowerCase()))); return sortMode === 'Popular' ? matches.sort((a, b) => (b.like_count || 0) - (a.like_count || 0)) : matches.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) }, [posts, campus, category, searchQuery, sortMode])
+  useEffect(() => {
+    if (!postToOpen) return
+    const post = visible.find(item => String(item.id) === postToOpen)
+    if (!post) return
+    const element = document.getElementById(`post-${post.id}`)
+    if (!element) return
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    element.classList.add('post-share-target')
+    const timer = window.setTimeout(() => element.classList.remove('post-share-target'), 2600)
+    return () => window.clearTimeout(timer)
+  }, [postToOpen, visible])
   return <div className="feed-layout"><section className="feed-main"><div className="feed-toolbar"><label className="select-with-icon"><MapPin size={15} /><select value={campus} onChange={e => setCampus(e.target.value)}>{campuses.map(item => <option key={item}>{item}</option>)}</select><ChevronDown size={14} /></label><div className="feed-toolbar-actions"><button className="filter-button" onClick={() => setSortMenu(!sortMenu)}><SlidersHorizontal size={15} />Sort: {sortMode}</button><button className="filter-button feed-refresh-button" onClick={handleRefresh} disabled={feedRefreshing}><RefreshCw size={15} className={feedRefreshing ? 'feed-refresh-spinning' : ''} />{feedRefreshing ? 'Refreshing…' : 'Refresh feed'}</button></div></div>{sortMenu && <div className="feed-sort-menu"><span>Sort discussions</span>{['Latest', 'Popular'].map(item => <button key={item} className={sortMode === item ? 'sort-selected' : ''} onClick={() => { setSortMode(item); setSortMenu(false) }}>{item}{sortMode === item && <Check size={14} />}</button>)}</div>}<div className="feed-tabs">{['All posts', 'Faculty Guidance', 'Alumni Insights', 'Research Discussions'].map(item => <button key={item} className={category === item ? 'tab-active' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div>
     <div className="feed-intro"><div><span className="eyebrow">Your academic community</span><h1>Home feed</h1><p>Ideas, guidance, and opportunities from across your university.</p></div><Link className="button button-primary" to="/create"><Plus size={17} />Create a post</Link></div>
     <div className="post-list">{visible.map(post => <PostCard key={post.id} post={post} />)}{!visible.length && <div className="empty-state"><Search size={24} /><strong>No discussions found</strong><p>Try a different search, category, or campus.</p></div>}</div>
@@ -267,6 +318,72 @@ export function FacultyPage() {
         {isFaculty && faculty.id !== user.id && <section className="panel"><strong>Faculty network</strong><p className="muted-small">Connect through a cross-department collaboration request.</p><Link to="/collaborations" className="button button-secondary full-width">Browse collaborations</Link></section>}
       </aside></div>
     {requestOpen && <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && setRequestOpen(false)}><div className="modal-card"><div className="modal-heading"><div><span className="eyebrow">Academic guidance</span><h2>Request a consultation</h2></div><button className="icon-button" onClick={() => setRequestOpen(false)}><X size={18} /></button></div><div className="modal-person"><Avatar user={faculty} size="sm" /><div><strong>{faculty.full_name}</strong><small>{faculty.department} · {faculty.campus}</small></div></div><form onSubmit={submit} className="stack-form"><label>Topic<input required minLength="3" maxLength="160" value={form.topic} onChange={e => setForm({ ...form, topic: e.target.value })} placeholder="e.g. Final year project proposal" /></label><label>What would you like to discuss?<textarea required minLength="10" maxLength="1000" rows="4" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="Share a few details so the faculty member can prepare…" /></label><label>Preferred time<select value={form.requested_slot} onChange={e => setForm({ ...form, requested_slot: e.target.value })}><option>Flexible</option><option>Monday morning</option><option>Tuesday afternoon</option><option>Wednesday morning</option><option>Thursday afternoon</option></select></label><div className="modal-actions"><button type="button" className="button button-secondary" onClick={() => setRequestOpen(false)}>Cancel</button><button className="button button-primary"><Send size={15} />Send request</button></div></form></div></div>}
+  </div>
+}
+
+export function PublicProfilePage() {
+  const { id } = useParams()
+  const { user, users, posts, token, isLive } = useCampusBridge()
+  const [profile, setProfile] = useState(() => users.find(person => String(person.id) === id) || null)
+  const [loading, setLoading] = useState(!profile)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    const localProfile = users.find(person => String(person.id) === id)
+    if (localProfile) {
+      setProfile(localProfile)
+      setError('')
+      setLoading(false)
+      return () => { cancelled = true }
+    }
+    if (!isLive) {
+      setProfile(null)
+      setError('This profile is not available in the demo community.')
+      setLoading(false)
+      return () => { cancelled = true }
+    }
+    setLoading(true)
+    setError('')
+    request(`/users/${encodeURIComponent(id)}`, {}, token).then(result => {
+      if (!cancelled) setProfile(result)
+    }).catch(fetchError => {
+      if (!cancelled) {
+        setProfile(null)
+        setError(fetchError.message || 'This profile could not be loaded.')
+      }
+    }).finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [id, isLive, token, users])
+
+  if (loading) return <div className="empty-state panel"><UsersRound size={28} /><strong>Loading profile…</strong></div>
+  if (!profile) return <div className="empty-state panel"><UsersRound size={28} /><strong>Profile unavailable</strong><p>{error || 'This account may no longer be active.'}</p><Link className="button button-secondary button-small" to="/">Back to home feed</Link></div>
+
+  const subtitle = profile.role === 'student'
+    ? [profile.program, profile.semester].filter(Boolean).join(' · ') || 'Student'
+    : profile.role === 'alumni'
+      ? `Alumni${profile.passing_year ? ` · Class of ${profile.passing_year}` : ''}`
+      : profile.designation || labelRole(profile.role)
+  const authoredPosts = posts.filter(post => String(post.author?.id) === String(profile.id))
+  const academicItems = profile.role === 'student'
+    ? [['Degree program', profile.program], ['Department', profile.department], ['Current semester', profile.semester], ['Campus', profile.campus]]
+    : profile.role === 'faculty'
+      ? [['Designation', profile.designation], ['Department', profile.department], ['Qualifications', profile.qualifications], ['Campus', profile.campus]]
+      : [['Class year', profile.passing_year ? `Class of ${profile.passing_year}` : 'Not provided'], ['Department', profile.department], ['Program', profile.program], ['Campus', profile.campus]]
+
+  return <div className="public-profile-page">
+    <Link to="/" className="back-link"><ArrowLeft size={16} />Back to home feed</Link>
+    <section className="public-profile-hero">
+      <SharedProfileCover className="public-profile-cover" label="CampusBridge · Academic community" />
+      <div className="public-profile-identity"><Avatar user={profile} size="xxl" /><div className="public-profile-heading"><h1>{profile.full_name}</h1><p>{subtitle}</p><div className="public-profile-tags"><RoleBadge user={profile} />{profile.verified && profile.role === 'faculty' && <span className="verified-chip"><BadgeCheck size={14} />Verified faculty</span>}</div></div></div>
+    </section>
+    <div className="public-profile-grid">
+      <div className="profile-main-column">
+        <section className="panel profile-about"><SectionTitle icon={GraduationCap} title="About" /><p>{profile.bio || 'This member has not added an introduction yet.'}</p><div className="credential-grid">{academicItems.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value || 'Not provided'}</strong></div>)}</div>{!!profile.expertise?.length && <div className="public-profile-interests"><strong>Skills and interests</strong><div className="tag-row">{profile.expertise.map(item => <span className="topic-tag" key={item}>{item}</span>)}</div></div>}</section>
+        <section className="public-profile-posts"><div className="public-profile-section-title"><div><span className="eyebrow">Community activity</span><h2>Posts by {profile.full_name.split(' ')[0]}</h2></div><span>{authoredPosts.length} {authoredPosts.length === 1 ? 'post' : 'posts'}</span></div><div className="post-list">{authoredPosts.map(post => <PostCard key={post.id} post={post} />)}{!authoredPosts.length && <div className="empty-state panel"><MessageCircle size={25} /><strong>No posts yet</strong><p>Posts from this member will appear here.</p></div>}</div></section>
+      </div>
+      <aside className="profile-side-column"><section className="panel public-profile-community"><SectionTitle icon={UsersRound} title="University profile" /><div className="public-profile-fact"><span>Role</span><strong>{labelRole(profile.role)}</strong></div><div className="public-profile-fact"><span>Campus</span><strong>{profile.campus || 'Not provided'}</strong></div><div className="public-profile-fact"><span>Department</span><strong>{profile.department || 'Not provided'}</strong></div>{String(profile.id) === String(user?.id) && <Link className="button button-secondary full-width" to="/settings"><Settings size={15} />Edit your profile</Link>}</section></aside>
+    </div>
   </div>
 }
 
