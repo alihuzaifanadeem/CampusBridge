@@ -11,6 +11,7 @@ docker compose up --build
 ```
 
 Open [http://localhost:5173](http://localhost:5173). The API is available at [http://localhost:8000](http://localhost:8000), with interactive API documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
+pgAdmin is available at [http://localhost:5050](http://localhost:5050) and comes with the CampusBridge server pre-registered; pgAdmin connects to PostgreSQL over Docker's private network.
 
 The first API startup creates the PostgreSQL tables and inserts clearly marked demo records. The compose configuration is for local development; change the development database password, secret, CORS settings, and deployment configuration before hosting the service.
 
@@ -22,7 +23,9 @@ Docker Compose runs PostgreSQL 16 in the `database` service. FastAPI connects to
 docker compose exec database psql -U campusbridge -d campusbridge
 ```
 
-`docker compose down` stops the containers and preserves the database and uploaded-cover image volumes. They remain available the next time you run `docker compose up`.
+`docker compose down` stops the containers and preserves the database, uploaded-cover images, and pgAdmin settings. They remain available the next time you run `docker compose up`.
+
+For pgAdmin web sign-in, use the email and password in `.env` (defaults: `admin@campusbridge.edu` and `CampusBridgeAdmin2026!`). Expand **Servers → CampusBridge PostgreSQL → Databases → campusbridge → Schemas → public → Tables**. Enter the PostgreSQL password `campusbridge_dev` the first time pgAdmin connects. To view rows, right-click a table and choose **View/Edit Data → All Rows**. The pgAdmin server definition and login persist in the `campusbridge-pgadmin` volume.
 
 ### Run services separately
 
