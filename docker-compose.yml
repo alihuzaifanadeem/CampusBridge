@@ -6,6 +6,8 @@ services:
       POSTGRES_DB: campusbridge
       POSTGRES_USER: campusbridge
       POSTGRES_PASSWORD: campusbridge_dev
+    ports:
+      - "127.0.0.1:5433:5432"
     volumes:
       - campusbridge-data:/var/lib/postgresql/data
     healthcheck:
@@ -13,23 +15,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
-
-  pgadmin:
-    image: dpage/pgadmin4:9.19
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@campusbridge.edu}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-CampusBridgeAdmin2026!}
-      PGADMIN_DISABLE_POSTFIX: "1"
-      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
-    volumes:
-      - campusbridge-pgadmin:/var/lib/pgadmin
-      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
-    ports:
-      - "127.0.0.1:5050:80"
-    depends_on:
-      database:
-        condition: service_healthy
 
   api:
     build: ./backend
@@ -62,4 +47,3 @@ services:
 volumes:
   campusbridge-data:
   campusbridge-media:
-  campusbridge-pgadmin:
