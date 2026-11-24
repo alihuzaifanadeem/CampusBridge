@@ -5,7 +5,7 @@ import { Avatar, CampusMark, RoleBadge, Toast } from './components.jsx'
 import { useCampusBridge } from './App.jsx'
 
 export default function Layout() {
-  const { user, logout, toast, clearToast, searchQuery, setSearchQuery } = useCampusBridge()
+  const { user, logout, toast, clearToast, searchQuery, setSearchQuery, refreshFeed } = useCampusBridge()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountMenu, setAccountMenu] = useState(false)
   const navigate = useNavigate()
@@ -26,7 +26,7 @@ export default function Layout() {
       <div className="brand-row"><CampusMark /><span>Campus<span className="brand-light">Bridge</span></span><button className="icon-button sidebar-close" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X size={18} /></button></div>
       <nav className="main-nav" aria-label="Main navigation">
         <p className="nav-label">Workspace</p>
-        {links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'nav-active' : ''}`}><Icon size={18} /><span>{label}</span>{label === 'Assistance requests' && <span className="nav-dot" />}</NavLink>)}
+        {links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} title={to === '/' ? 'Double-click to refresh the latest feed posts' : undefined} onClick={() => setMobileOpen(false)} onDoubleClick={to === '/' ? () => { void refreshFeed() } : undefined} className={({ isActive }) => `nav-item ${isActive ? 'nav-active' : ''}`}><Icon size={18} /><span>{label}</span>{label === 'Assistance requests' && <span className="nav-dot" />}</NavLink>)}
       </nav>
       <div className="sidebar-note"><div className="note-icon"><GraduationCap size={17} /></div><strong>Academic community</strong><p>Connect, learn, and collaborate across your campuses.</p></div>
       {accountMenu && <div className="account-menu"><button onClick={() => { navigate('/settings'); setAccountMenu(false) }}><Settings size={15} />Profile settings</button><button onClick={() => { logout(); setAccountMenu(false) }}><LogOut size={15} />Sign out</button></div>}

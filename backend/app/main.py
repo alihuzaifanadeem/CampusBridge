@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from .database import (
@@ -301,6 +301,7 @@ async def register(
     password: str = Form(..., min_length=10, max_length=128),
     role: Literal["student", "faculty", "alumni"] = Form(...),
     campus: str = Form(default="Main Campus", max_length=80),
+    student_id: str = Form(default="", max_length=80),
     department: str = Form(default="", max_length=120),
     card_front: UploadFile | None = File(default=None),
     card_back: UploadFile | None = File(default=None),
@@ -312,6 +313,8 @@ async def register(
     pending_request = db.scalar(select(AccountRequest.id).where(AccountRequest.email == email_value, AccountRequest.status == "pending"))
     if pending_request:
         raise HTTPException(status_code=409, detail="A signup request for this email is already awaiting university review.")
+    if role == "student" and not student_id.strip():
+        raise HTTPException(status_code=422, detail="Enter your student ID or university roll number.")
 
     async def read_card(upload: UploadFile | None, side: str) -> tuple[bytes | None, str | None]:
         if upload is None:
@@ -337,6 +340,7 @@ async def register(
         email=email_value,
         password_hash=hash_password(password),
         full_name=full_name.strip(),
+        student_id=student_id.strip() if role == "student" else "",
         role=role,
         campus=campus.strip(),
         department=department.strip(),
@@ -600,6 +604,7 @@ def account_request_dict(item: AccountRequest, include_images: bool = False) -> 
         "id": item.id,
         "email": item.email,
         "full_name": item.full_name,
+        "student_id": item.student_id,
         "role": item.role,
         "campus": item.campus,
         "department": item.department,
@@ -865,5 +870,7 @@ def seed_demo_data() -> None:
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE account_requests ADD COLUMN IF NOT EXISTS student_id VARCHAR(80) NOT NULL DEFAULT ''"))
     if os.getenv("SEED_DEMO_DATA", "true").lower() == "true":
         seed_demo_data()

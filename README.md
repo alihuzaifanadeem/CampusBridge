@@ -64,9 +64,10 @@ The sign-in page also has one-click demo entry. Demo mode stores sample changes 
 
 - Email and password registration and sign-in, signed expiring sessions, role-aware navigation, and profile editing.
 - Student, faculty, and alumni identity badges and profile views.
-- Account signup requests are held for admin review before a user account is created; student card images are stored privately in PostgreSQL while pending and deleted after approval or rejection.
+- Account signup requests are held for admin review before a user account is created; student requests require a university student ID and front/back card images that admins can inspect before approval. Card images are stored privately in PostgreSQL while pending and deleted after approval or rejection.
 - Searchable faculty directory with department, expertise, campus, and availability filters.
 - Academic feed with campus/category filtering, post creation, resource links, comments, likes, saves, and a saved-discussions view.
+- Refresh the home feed without reloading the application with the feed refresh button or by double-clicking **Home feed**.
 - Student consultation requests and faculty approval, decline, and reschedule actions.
 - Faculty availability, weekly schedule blocks, and a student-facing profile preview.
 - Faculty-only cross-department collaboration requests and responses.

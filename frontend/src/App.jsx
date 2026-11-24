@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './Layout.jsx'
 import { request, postJson, patchJson, putForm } from './api.js'
@@ -33,17 +33,32 @@ export default function App() {
   const [collaborations, setCollaborations] = useState(() => restore('cb.demo.collaborations', demoCollaborations))
   const [toast, setToast] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [feedRefreshing, setFeedRefreshing] = useState(false)
   const [profileCoverTheme, setProfileCoverTheme] = useState(() => demoCover.theme || localStorage.getItem('cb.demo.profileCoverTheme') || 'blue')
   const [profileCoverImageUrl, setProfileCoverImageUrl] = useState(() => demoCover.imageUrl || null)
   const [profileCoverWidth, setProfileCoverWidth] = useState(() => Number(demoCover.width) || 1600)
   const [profileCoverHeight, setProfileCoverHeight] = useState(() => Number(demoCover.height) || 177)
   const isLive = Boolean(token && token !== 'demo')
 
-  const notify = (message, kind = 'success') => {
+  const notify = useCallback((message, kind = 'success') => {
     setToast({ message, kind })
     window.clearTimeout(window.__cbToastTimer)
     window.__cbToastTimer = window.setTimeout(() => setToast(null), 3800)
-  }
+  }, [])
+
+  const refreshFeed = useCallback(async () => {
+    if (feedRefreshing) return
+    setFeedRefreshing(true)
+    try {
+      if (isLive) setPosts(await request('/posts', {}, token))
+      else setPosts(restore('cb.demo.posts', demoPosts))
+      notify('Feed refreshed with the latest posts.')
+    } catch (error) {
+      notify(error.message || 'Could not refresh the feed.', 'error')
+    } finally {
+      setFeedRefreshing(false)
+    }
+  }, [feedRefreshing, isLive, token, notify])
 
   useEffect(() => {
     const storedUser = localStorage.getItem('cb.user')
@@ -221,7 +236,7 @@ export default function App() {
     return updated
   }
 
-  const value = useMemo(() => ({ user, token, isLive, posts, setPosts, users, guidance, collaborations, toast, clearToast: () => setToast(null), notify, searchQuery, setSearchQuery, profileCoverTheme, profileCoverImageUrl, profileCoverWidth, profileCoverHeight, updateProfileCover, login, logout, createPost, toggleLike, toggleSave, addComment, createGuidance, updateGuidance, createCollaboration, respondCollaboration, updateProfile }), [user, token, isLive, posts, users, guidance, collaborations, toast, searchQuery, profileCoverTheme, profileCoverImageUrl, profileCoverWidth, profileCoverHeight, updateProfileCover])
+  const value = useMemo(() => ({ user, token, isLive, posts, setPosts, users, guidance, collaborations, toast, clearToast: () => setToast(null), notify, searchQuery, setSearchQuery, feedRefreshing, refreshFeed, profileCoverTheme, profileCoverImageUrl, profileCoverWidth, profileCoverHeight, updateProfileCover, login, logout, createPost, toggleLike, toggleSave, addComment, createGuidance, updateGuidance, createCollaboration, respondCollaboration, updateProfile }), [user, token, isLive, posts, users, guidance, collaborations, toast, searchQuery, feedRefreshing, refreshFeed, notify, profileCoverTheme, profileCoverImageUrl, profileCoverWidth, profileCoverHeight, updateProfileCover])
 
   return <Context.Provider value={value}>
     <Routes>
