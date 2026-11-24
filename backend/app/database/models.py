@@ -17,6 +17,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     full_name: Mapped[str] = mapped_column(String(120))
+    profile_image_filename: Mapped[str] = mapped_column(String(80), default="")
     role: Mapped[str] = mapped_column(String(24), index=True)
     campus: Mapped[str] = mapped_column(String(80), default="Main Campus")
     department: Mapped[str] = mapped_column(String(120), default="")

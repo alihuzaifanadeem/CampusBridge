@@ -190,6 +190,25 @@ class ProfileCoverUpdate(BaseModel):
 
 PROFILE_COVER_MEDIA_DIR = Path(os.getenv("MEDIA_DIR", str(Path(__file__).resolve().parents[1] / "media")))
 PROFILE_COVER_MAX_BYTES = 2 * 1024 * 1024
+PROFILE_AVATAR_MEDIA_DIR = PROFILE_COVER_MEDIA_DIR / "avatars"
+PROFILE_AVATAR_MAX_BYTES = 2 * 1024 * 1024
+
+
+def profile_avatar_file(filename: str) -> tuple[Path, str]:
+    extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
+    stem = filename.rsplit(".", 1)[0] if "." in filename else ""
+    media_types = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}
+    if len(stem) != 32 or any(char not in "0123456789abcdef" for char in stem) or extension not in media_types:
+        raise HTTPException(status_code=404, detail="The profile image is unavailable.")
+    return PROFILE_AVATAR_MEDIA_DIR / filename, media_types[extension]
+
+
+def remove_profile_avatar_file(filename: str) -> None:
+    try:
+        path, _ = profile_avatar_file(filename)
+    except HTTPException:
+        return
+    path.unlink(missing_ok=True)
 
 
 def user_dict(user: User) -> dict[str, Any]:
@@ -197,6 +216,7 @@ def user_dict(user: User) -> dict[str, Any]:
         "id": user.id,
         "email": user.email,
         "full_name": user.full_name,
+        "profile_image_url": f"/api/users/{user.id}/avatar?v={user.profile_image_filename}" if user.profile_image_filename else None,
         "role": user.role,
         "campus": user.campus,
         "department": user.department,
@@ -434,6 +454,67 @@ def get_user(user_id: int, db: Session = Depends(get_db), viewer: User = Depends
     if not target or not target.active or (target.role == "faculty" and not target.verified and viewer.role not in {"admin", "system_admin"}):
         raise HTTPException(status_code=404, detail="Profile not found.")
     return user_dict(target)
+
+
+@app.get("/api/users/{user_id}/avatar")
+def get_user_avatar(user_id: int, db: Session = Depends(get_db)) -> FileResponse:
+    user = db.get(User, user_id)
+    if not user or not user.active or not user.profile_image_filename:
+        raise HTTPException(status_code=404, detail="No profile image is available.")
+    path, media_type = profile_avatar_file(user.profile_image_filename)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="The profile image is unavailable.")
+    return FileResponse(path, media_type=media_type, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
+@app.put("/api/profile/avatar")
+async def update_profile_avatar(
+    image: UploadFile | None = File(default=None),
+    remove_image: bool = Form(default=False),
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+) -> dict[str, Any]:
+    old_filename = user.profile_image_filename
+    if remove_image:
+        user.profile_image_filename = ""
+        db.commit()
+        if old_filename:
+            remove_profile_avatar_file(old_filename)
+        db.refresh(user)
+        return user_dict(user)
+    if image is None:
+        raise HTTPException(status_code=422, detail="Choose a profile image to upload.")
+
+    image_bytes = await image.read(PROFILE_AVATAR_MAX_BYTES + 1)
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Choose a non-empty image file.")
+    if len(image_bytes) > PROFILE_AVATAR_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Profile images must be 2 MB or smaller.")
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        extension = "png"
+    elif image_bytes.startswith(b"\xff\xd8\xff"):
+        extension = "jpg"
+    elif image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        extension = "webp"
+    else:
+        raise HTTPException(status_code=415, detail="Use a PNG, JPG, or WebP image.")
+
+    new_filename = f"{uuid.uuid4().hex}.{extension}"
+    PROFILE_AVATAR_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    new_path = PROFILE_AVATAR_MEDIA_DIR / new_filename
+    new_path.write_bytes(image_bytes)
+    user.profile_image_filename = new_filename
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        new_path.unlink(missing_ok=True)
+        raise
+
+    if old_filename:
+        remove_profile_avatar_file(old_filename)
+    db.refresh(user)
+    return user_dict(user)
 
 
 @app.get("/api/posts")
@@ -875,5 +956,6 @@ def startup() -> None:
     Base.metadata.create_all(bind=engine)
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE account_requests ADD COLUMN IF NOT EXISTS student_id VARCHAR(80) NOT NULL DEFAULT ''"))
+        connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image_filename VARCHAR(80) NOT NULL DEFAULT ''"))
     if os.getenv("SEED_DEMO_DATA", "true").lower() == "true":
         seed_demo_data()

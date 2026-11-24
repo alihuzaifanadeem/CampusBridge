@@ -70,6 +70,7 @@
 .settings-main > .stack-form > label:nth-last-child(-n + 2) { grid-column: 1 / -1; }
 .settings-avatar { display: flex; align-items: center; gap: 10px; padding: 0 0 15px; margin-bottom: 15px; border-bottom: 1px solid #edf0f4; }
 .settings-avatar > div { display: flex; flex-direction: column; gap: 5px; }.settings-avatar strong { color: #36465f; font-size: 11px; }
+.profile-photo-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 3px; }.profile-photo-picker { position: relative; display: inline-flex !important; flex-direction: row !important; align-items: center; width: fit-content !important; overflow: hidden; cursor: pointer; }.profile-photo-picker input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }.profile-photo-hint { color: #8793a5; font-size: 8px; }
 .settings-main label { display: flex; flex-direction: column; gap: 6px; color: #45546c; font-size: 9px; font-weight: 700; }
 .settings-main input, .settings-main select, .settings-main textarea { min-height: 37px; width: 100%; padding: 8px 10px; border: 1px solid #dfe5ed; border-radius: 8px; outline: 0; background: #fff; color: #394961; font-size: 10px; font-weight: 500; }
 .settings-main input[readonly] { background: #f8f9fb; color: #8b97a8; }

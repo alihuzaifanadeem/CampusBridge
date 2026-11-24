@@ -8,8 +8,9 @@ export function initials(name = 'Campus Bridge') {
 
 export function Avatar({ user, size = 'md', className = '' }) {
   const name = typeof user === 'string' ? user : user?.full_name || user?.name || 'Campus Bridge'
+  const imageUrl = typeof user === 'string' ? '' : user?.profile_image_url
   const key = name.split('').reduce((value, char) => value + char.charCodeAt(0), 0) % swatches.length
-  return <span className={`avatar avatar-${size} avatar-${swatches[key]} ${className}`} aria-label={name}>{initials(name)}</span>
+  return <span className={`avatar avatar-${size} avatar-${swatches[key]} ${className}`} aria-label={name}>{imageUrl ? <img className="avatar-image" src={imageUrl} alt="" /> : initials(name)}</span>
 }
 
 export function RoleBadge({ user }) {

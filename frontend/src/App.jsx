@@ -202,6 +202,34 @@ export default function App() {
     return updated
   }
 
+  const updateProfilePhoto = useCallback(async (image, removeImage = false) => {
+    let updated
+    if (isLive) {
+      const body = new FormData()
+      body.append('remove_image', String(Boolean(removeImage)))
+      if (image) body.append('image', image)
+      try { updated = await putForm('/profile/avatar', body, token) }
+      catch (error) { notify(error.message, 'error'); throw error }
+    } else {
+      const profileImageUrl = image ? await fileToDataUrl(image) : removeImage ? null : user.profile_image_url || null
+      updated = { ...user, profile_image_url: profileImageUrl }
+    }
+
+    const updateAvatar = person => person?.id === updated.id ? { ...person, profile_image_url: updated.profile_image_url } : person
+    setUser(updated)
+    localStorage.setItem('cb.user', JSON.stringify(updated))
+    setUsers(items => items.map(updateAvatar))
+    setPosts(items => items.map(post => ({
+      ...post,
+      author: updateAvatar(post.author),
+      comments: (post.comments || []).map(comment => ({ ...comment, author: updateAvatar(comment.author) })),
+    })))
+    setGuidance(items => items.map(item => ({ ...item, requester: updateAvatar(item.requester), faculty: updateAvatar(item.faculty) })))
+    setCollaborations(items => items.map(item => ({ ...item, author: updateAvatar(item.author) })))
+    notify(removeImage ? 'Profile photo removed.' : 'Profile photo updated.')
+    return updated
+  }, [isLive, token, user, notify])
+
   const updateProfileCover = async ({ theme, width, height, image, removeImage }) => {
     if (!['blue', 'violet', 'teal', 'sunset'].includes(theme)) throw new Error('Choose a supported profile background.')
     if (isLive) {
@@ -236,7 +264,7 @@ export default function App() {
     return updated
   }
 
-  const value = useMemo(() => ({ user, token, isLive, posts, setPosts, users, guidance, collaborations, toast, clearToast: () => setToast(null), notify, searchQuery, setSearchQuery, feedRefreshing, refreshFeed, profileCoverTheme, profileCoverImageUrl, profileCoverWidth, profileCoverHeight, updateProfileCover, login, logout, createPost, toggleLike, toggleSave, addComment, createGuidance, updateGuidance, createCollaboration, respondCollaboration, updateProfile }), [user, token, isLive, posts, users, guidance, collaborations, toast, searchQuery, feedRefreshing, refreshFeed, notify, profileCoverTheme, profileCoverImageUrl, profileCoverWidth, profileCoverHeight, updateProfileCover])
+  const value = useMemo(() => ({ user, token, isLive, posts, setPosts, users, guidance, collaborations, toast, clearToast: () => setToast(null), notify, searchQuery, setSearchQuery, feedRefreshing, refreshFeed, profileCoverTheme, profileCoverImageUrl, profileCoverWidth, profileCoverHeight, updateProfileCover, updateProfilePhoto, login, logout, createPost, toggleLike, toggleSave, addComment, createGuidance, updateGuidance, createCollaboration, respondCollaboration, updateProfile }), [user, token, isLive, posts, users, guidance, collaborations, toast, searchQuery, feedRefreshing, refreshFeed, notify, profileCoverTheme, profileCoverImageUrl, profileCoverWidth, profileCoverHeight, updateProfileCover, updateProfilePhoto])
 
   return <Context.Provider value={value}>
     <Routes>

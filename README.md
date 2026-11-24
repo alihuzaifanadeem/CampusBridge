@@ -73,6 +73,7 @@ The sign-in page also has one-click demo entry. Demo mode stores sample changes 
 - Faculty-only cross-department collaboration requests and responses.
 - Admin account management, signup approval/rejection, faculty verification, account activation controls, post moderation, and an admin-only shared profile cover setting.
 - Admins can upload a PNG, JPG, or WebP shared profile cover (up to 2 MB) and set its display width (320–2400 px) and height (100–500 px); image files persist in `campusbridge-media` and cover settings in PostgreSQL.
+- Each signed-in user can upload or remove their own PNG, JPG, or WebP profile photo (up to 2 MB); photos appear on avatars throughout the app and persist in `campusbridge-media`.
 - Role-specific sidebar navigation in a fixed-height, independently scrollable sidebar.
 
 ## Project structure
