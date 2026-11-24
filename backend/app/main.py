@@ -37,6 +37,9 @@ from .database import (
     get_db,
 )
 
+SECRET_KEY = os.getenv("SECRET_KEY", "local-development-key-change-before-deployment")
+TOKEN_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", "24"))
+
 
 def hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
