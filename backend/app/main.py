@@ -21,6 +21,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from .database import (
+    AccountRequest,
     Base,
     CollaborationRequest,
     CollaborationResponse,
@@ -98,15 +99,6 @@ def require_roles(*roles: str):
             raise HTTPException(status_code=403, detail="You do not have access to this feature.")
         return user
     return checker
-
-
-class RegisterBody(BaseModel):
-    full_name: str = Field(min_length=2, max_length=120)
-    email: EmailStr
-    password: str = Field(min_length=10, max_length=128)
-    role: Literal["student", "faculty", "alumni"]
-    campus: str = Field(default="Main Campus", max_length=80)
-    department: str = Field(default="", max_length=120)
 
 
 class LoginBody(BaseModel):
@@ -302,30 +294,74 @@ def health(db: Session = Depends(get_db)) -> dict[str, str]:
     return {"status": "ok", "database": "connected"}
 
 
-@app.post("/api/auth/register", status_code=201)
-def register(body: RegisterBody, db: Session = Depends(get_db)) -> dict[str, Any]:
-    email = body.email.lower()
-    if db.scalar(select(User).where(User.email == email)):
+@app.post("/api/auth/register", status_code=202)
+async def register(
+    full_name: str = Form(..., min_length=2, max_length=120),
+    email: EmailStr = Form(...),
+    password: str = Form(..., min_length=10, max_length=128),
+    role: Literal["student", "faculty", "alumni"] = Form(...),
+    campus: str = Form(default="Main Campus", max_length=80),
+    department: str = Form(default="", max_length=120),
+    card_front: UploadFile | None = File(default=None),
+    card_back: UploadFile | None = File(default=None),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    email_value = str(email).lower()
+    if db.scalar(select(User.id).where(func.lower(User.email) == email_value)):
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
-    user = User(
-        email=email,
-        password_hash=hash_password(body.password),
-        full_name=body.full_name.strip(),
-        role=body.role,
-        campus=body.campus,
-        department=body.department,
-        verified=body.role != "faculty",
-        availability="busy",
+    pending_request = db.scalar(select(AccountRequest.id).where(AccountRequest.email == email_value, AccountRequest.status == "pending"))
+    if pending_request:
+        raise HTTPException(status_code=409, detail="A signup request for this email is already awaiting university review.")
+
+    async def read_card(upload: UploadFile | None, side: str) -> tuple[bytes | None, str | None]:
+        if upload is None:
+            if role == "student":
+                raise HTTPException(status_code=422, detail=f"Upload the front and back of your university card. The {side} image is required.")
+            return None, None
+        data = await upload.read(2 * 1024 * 1024 + 1)
+        if not data:
+            raise HTTPException(status_code=400, detail=f"The {side} university-card image is empty.")
+        if len(data) > 2 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail=f"Each university-card image must be 2 MB or smaller.")
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
+            return data, "image/png"
+        if data.startswith(b"\xff\xd8\xff"):
+            return data, "image/jpeg"
+        if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            return data, "image/webp"
+        raise HTTPException(status_code=415, detail=f"The {side} card must be a PNG, JPG, or WebP image.")
+
+    front_bytes, front_mime = await read_card(card_front, "front")
+    back_bytes, back_mime = await read_card(card_back, "back")
+    account_request = AccountRequest(
+        email=email_value,
+        password_hash=hash_password(password),
+        full_name=full_name.strip(),
+        role=role,
+        campus=campus.strip(),
+        department=department.strip(),
+        card_front_image=front_bytes,
+        card_front_mime=front_mime,
+        card_back_image=back_bytes,
+        card_back_mime=back_mime,
     )
-    db.add(user)
+    db.add(account_request)
     db.commit()
-    db.refresh(user)
-    return {"access_token": make_token(user.id), "token_type": "bearer", "user": user_dict(user)}
+    db.refresh(account_request)
+    return {
+        "request_id": account_request.id,
+        "status": account_request.status,
+        "message": "We received your account request. The university will verify your details and card. You can sign in after an admin approves it, usually within 24 hours.",
+    }
 
 
 @app.post("/api/auth/login")
 def login(body: LoginBody, db: Session = Depends(get_db)) -> dict[str, Any]:
     user = db.scalar(select(User).where(User.email == body.email.lower()))
+    if not user:
+        pending_request = db.scalar(select(AccountRequest.id).where(AccountRequest.email == body.email.lower(), AccountRequest.status == "pending"))
+        if pending_request:
+            raise HTTPException(status_code=403, detail="Your account request is still awaiting university approval. You can sign in once it is approved; reviews are usually completed within 24 hours.")
     if not user or not user.active or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Email or password is incorrect.")
     return {"access_token": make_token(user.id), "token_type": "bearer", "user": user_dict(user)}
@@ -557,6 +593,103 @@ def admin_overview(db: Session = Depends(get_db), user: User = Depends(require_r
         "posts": db.scalar(select(func.count()).select_from(Post)) or 0,
         "pending_requests": db.scalar(select(func.count()).select_from(GuidanceRequest).where(GuidanceRequest.status == "pending")) or 0,
     }
+
+
+def account_request_dict(item: AccountRequest, include_images: bool = False) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "id": item.id,
+        "email": item.email,
+        "full_name": item.full_name,
+        "role": item.role,
+        "campus": item.campus,
+        "department": item.department,
+        "status": item.status,
+        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "has_card_front": item.card_front_image is not None,
+        "has_card_back": item.card_back_image is not None,
+    }
+    if include_images:
+        result["card_front_image"] = f"data:{item.card_front_mime};base64,{base64.b64encode(item.card_front_image).decode()}" if item.card_front_image and item.card_front_mime else None
+        result["card_back_image"] = f"data:{item.card_back_mime};base64,{base64.b64encode(item.card_back_image).decode()}" if item.card_back_image and item.card_back_mime else None
+    return result
+
+
+@app.get("/api/admin/account-requests")
+def list_account_requests(
+    request_status: Literal["pending", "approved", "rejected"] = Query(default="pending", alias="status"),
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_roles("admin", "system_admin")),
+) -> list[dict[str, Any]]:
+    items = db.scalars(select(AccountRequest).where(AccountRequest.status == request_status).order_by(AccountRequest.created_at.desc())).all()
+    return [account_request_dict(item) for item in items]
+
+
+@app.get("/api/admin/account-requests/{request_id}")
+def get_account_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_roles("admin", "system_admin")),
+) -> dict[str, Any]:
+    item = db.get(AccountRequest, request_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Account request not found.")
+    return account_request_dict(item, include_images=True)
+
+
+@app.post("/api/admin/account-requests/{request_id}/approve")
+def approve_account_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_roles("admin", "system_admin")),
+) -> dict[str, Any]:
+    item = db.get(AccountRequest, request_id)
+    if not item or item.status != "pending":
+        raise HTTPException(status_code=404, detail="Pending account request not found.")
+    if db.scalar(select(User.id).where(func.lower(User.email) == item.email)):
+        raise HTTPException(status_code=409, detail="An account with this email already exists. Reject this duplicate request.")
+    user = User(
+        email=item.email,
+        password_hash=item.password_hash,
+        full_name=item.full_name,
+        role=item.role,
+        campus=item.campus,
+        department=item.department,
+        verified=item.role != "faculty",
+        availability="busy",
+    )
+    db.add(user)
+    item.status = "approved"
+    item.password_hash = ""
+    item.card_front_image = None
+    item.card_front_mime = None
+    item.card_back_image = None
+    item.card_back_mime = None
+    item.reviewed_at = datetime.now(timezone.utc)
+    item.reviewed_by_id = actor.id
+    db.commit()
+    db.refresh(user)
+    return {"status": "approved", "user": user_dict(user)}
+
+
+@app.post("/api/admin/account-requests/{request_id}/reject")
+def reject_account_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_roles("admin", "system_admin")),
+) -> dict[str, str]:
+    item = db.get(AccountRequest, request_id)
+    if not item or item.status != "pending":
+        raise HTTPException(status_code=404, detail="Pending account request not found.")
+    item.status = "rejected"
+    item.password_hash = ""
+    item.card_front_image = None
+    item.card_front_mime = None
+    item.card_back_image = None
+    item.card_back_mime = None
+    item.reviewed_at = datetime.now(timezone.utc)
+    item.reviewed_by_id = actor.id
+    db.commit()
+    return {"status": "rejected"}
 
 
 @app.get("/api/profile-cover")

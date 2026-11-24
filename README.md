@@ -62,12 +62,13 @@ The sign-in page also has one-click demo entry. Demo mode stores sample changes 
 
 - Email and password registration and sign-in, signed expiring sessions, role-aware navigation, and profile editing.
 - Student, faculty, and alumni identity badges and profile views.
+- Account signup requests are held for admin review before a user account is created; student card images are stored privately in PostgreSQL while pending and deleted after approval or rejection.
 - Searchable faculty directory with department, expertise, campus, and availability filters.
 - Academic feed with campus/category filtering, post creation, resource links, comments, likes, saves, and a saved-discussions view.
 - Student consultation requests and faculty approval, decline, and reschedule actions.
 - Faculty availability, weekly schedule blocks, and a student-facing profile preview.
 - Faculty-only cross-department collaboration requests and responses.
-- Admin account management, faculty verification, account activation controls, post moderation, and an admin-only shared profile cover setting.
+- Admin account management, signup approval/rejection, faculty verification, account activation controls, post moderation, and an admin-only shared profile cover setting.
 - Admins can upload a PNG, JPG, or WebP shared profile cover (up to 2 MB) and set its display width (320–2400 px) and height (100–500 px); image files persist in `campusbridge-media` and cover settings in PostgreSQL.
 - Role-specific sidebar navigation in a fixed-height, independently scrollable sidebar.
 

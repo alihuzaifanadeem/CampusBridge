@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Activity, ArrowDownUp, ArrowLeft, ArrowRight, BadgeCheck, Bell, Bookmark, BookOpen, BriefcaseBusiness, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clock3, Eye, FileText, Filter, FlaskConical, GraduationCap, Heart, Link2, MapPin, MessageCircle, MoreHorizontal, Plus, Search, Send, Settings, ShieldCheck, SlidersHorizontal, Sparkles, ThumbsUp, UsersRound, X } from 'lucide-react'
-import { request, postJson, patchJson } from './api.js'
+import { request, postJson, postForm, patchJson } from './api.js'
 import { campuses, demoAccounts, demoEvents } from './demoData.js'
 import { Avatar, CampusMark, EventIcon, FacultyIcon, Metric, RoleBadge, SectionTitle, StatusPill, initials } from './components.jsx'
 import { useCampusBridge } from './App.jsx'
@@ -33,39 +33,103 @@ function SharedProfileCover({ className, label, compact = false, imageUrl, width
   </div>
 }
 
+function SignupRequestsPanel({ isLive, token, notify, onApproved }) {
+  const [requests, setRequests] = useState([])
+  const [selectedId, setSelectedId] = useState(null)
+  const [detail, setDetail] = useState(null)
+  const [busyId, setBusyId] = useState(null)
+  const loadRequests = async () => {
+    if (!isLive) return
+    try { setRequests(await request('/admin/account-requests?status=pending', {}, token)) }
+    catch (error) { notify(error.message, 'error') }
+  }
+  useEffect(() => { loadRequests() }, [isLive, token])
+  const openRequest = async item => {
+    setSelectedId(item.id); setDetail(null)
+    try { setDetail(await request(`/admin/account-requests/${item.id}`, {}, token)) }
+    catch (error) { notify(error.message, 'error') }
+  }
+  const reviewRequest = async (item, decision) => {
+    setBusyId(item.id)
+    try {
+      await request(`/admin/account-requests/${item.id}/${decision}`, { method: 'POST' }, token)
+      setRequests(current => current.filter(requestItem => requestItem.id !== item.id))
+      setSelectedId(null); setDetail(null)
+      notify(decision === 'approve' ? `${item.full_name}'s account is approved and ready to sign in.` : `${item.full_name}'s signup request was rejected.`)
+      if (decision === 'approve') await onApproved()
+    } catch (error) { notify(error.message, 'error') }
+    finally { setBusyId(null) }
+  }
+  const selectedRequest = requests.find(item => item.id === selectedId)
+  return <>
+    <div className="admin-toolbar"><div><h2>Review signup requests</h2><p>Verify student university cards before approving a new account.</p></div><button className="button button-secondary button-small" onClick={loadRequests} disabled={!isLive}><Activity size={13} />Refresh</button></div>
+    {!isLive ? <div className="empty-state">Sign in with a live admin account to review university signup requests.</div> : !requests.length ? <div className="empty-state"><CheckCircle2 size={24} /><strong>No pending signup requests</strong><p>New requests will appear here for review.</p></div> : <div className="signup-review-layout">
+      <div className="signup-request-list">{requests.map(item => <button type="button" key={item.id} className={`signup-request-item ${selectedId === item.id ? 'signup-request-selected' : ''}`} onClick={() => openRequest(item)}><strong>{item.full_name}</strong><span>{item.email}</span><small>{labelRole(item.role)} · {item.campus}</small><small>{new Date(item.created_at).toLocaleString()}</small></button>)}</div>
+      <div className="signup-request-detail">
+        {!selectedId && <div className="empty-state">Select a request to review the account details and card images.</div>}
+        {selectedId && !detail && <div className="empty-state">Loading request details…</div>}
+        {detail && <>
+          <div className="signup-detail-heading"><div><h3>{detail.full_name}</h3><p>{detail.email}</p></div><span className="signup-detail-role">{labelRole(detail.role)}</span></div>
+          <div className="signup-detail-meta"><span>Campus<strong>{detail.campus}</strong></span><span>Department<strong>{detail.department || 'Not provided'}</strong></span><span>Submitted<strong>{new Date(detail.created_at).toLocaleString()}</strong></span></div>
+          <div className="signup-card-images"><div><strong>University card · front</strong>{detail.card_front_image ? <img src={detail.card_front_image} alt={`${detail.full_name}'s university card front`} /> : <p className="muted-small">No front image supplied.</p>}</div><div><strong>University card · back</strong>{detail.card_back_image ? <img src={detail.card_back_image} alt={`${detail.full_name}'s university card back`} /> : <p className="muted-small">No back image supplied.</p>}</div></div>
+          <div className="signup-review-actions"><button className="button button-danger-soft" disabled={!selectedRequest || busyId === selectedId} onClick={() => selectedRequest && reviewRequest(selectedRequest, 'reject')}><X size={14} />Reject</button><button className="button button-primary" disabled={!selectedRequest || busyId === selectedId} onClick={() => selectedRequest && reviewRequest(selectedRequest, 'approve')}><Check size={14} />{busyId === selectedId ? 'Reviewing…' : 'Approve account'}</button></div>
+        </>}
+      </div>
+    </div>}
+  </>
+}
+
 export function LoginPage() {
   const { login, notify } = useCampusBridge()
   const [register, setRegister] = useState(false)
+  const [registrationMessage, setRegistrationMessage] = useState('')
+  const [cardFront, setCardFront] = useState(null)
+  const [cardBack, setCardBack] = useState(null)
   const [form, setForm] = useState({ full_name: '', email: '', password: '', role: 'student', campus: 'Main Campus' })
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
   const fillDemo = account => { setForm(current => ({ ...current, email: account.email, password: 'CampusBridge2026!' })); login(account.user); }
+  const selectCardImage = (event, setImage) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { notify('Choose a PNG, JPG, or WebP image.', 'error'); event.target.value = ''; return }
+    if (file.size > 2 * 1024 * 1024) { notify('Each university card image must be 2 MB or smaller.', 'error'); event.target.value = ''; return }
+    setImage(file)
+  }
   const submit = async event => {
     event.preventDefault(); setLoading(true)
     try {
       if (register) {
-        const data = await postJson('/auth/register', { ...form, full_name: form.full_name.trim() }, null)
-        login(data.user, data.access_token)
-        notify(form.role === 'faculty' ? 'Account created. Faculty verification is pending.' : 'Your account is ready.')
+        const payload = new FormData()
+        payload.append('full_name', form.full_name.trim())
+        payload.append('email', form.email.trim())
+        payload.append('password', form.password)
+        payload.append('role', form.role)
+        payload.append('campus', form.campus)
+        payload.append('department', '')
+        if (cardFront) payload.append('card_front', cardFront)
+        if (cardBack) payload.append('card_back', cardBack)
+        const data = await postForm('/auth/register', payload, null)
+        setRegistrationMessage(data.message || 'Your request was received. You can sign in after university review and admin approval.')
+        setRegister(false)
+        setForm(current => ({ ...current, password: '' }))
+        setCardFront(null); setCardBack(null)
+        notify('Signup request received. Your account is waiting for university approval.')
+        return
       } else {
         const data = await postJson('/auth/login', { email: form.email, password: form.password }, null)
         login(data.user, data.access_token)
       }
     } catch (error) {
-      if (register) {
-        if (error.status) { notify(error.message, 'error'); return }
-        const localUser = { id: Date.now(), full_name: form.full_name.trim(), email: form.email.toLowerCase(), role: form.role, campus: form.campus, department: '', expertise: [], verified: form.role !== 'faculty', availability: 'busy', bio: '' }
-        login(localUser)
-        notify(form.role === 'faculty' ? 'Demo profile created. Faculty verification is pending.' : 'Demo profile created. Your changes stay in this browser.')
-        setLoading(false)
-        return
+      if (register) notify(error.message || 'Could not submit your signup request. Please try again.', 'error')
+      else {
+        const account = demoAccounts.find(item => item.email === form.email.toLowerCase())
+        if (!error.status && account && form.password === 'CampusBridge2026!') {
+          login(account.user)
+          notify('Demo session started. Your changes stay in this browser.')
+        } else notify(error.message || 'Could not connect to CampusBridge.', 'error')
       }
-      const account = demoAccounts.find(item => item.email === form.email.toLowerCase())
-      if (!error.status && account && form.password === 'CampusBridge2026!') {
-        login(account.user)
-        notify('Demo session started. Your changes stay in this browser.')
-      } else notify(error.message || 'Could not connect to CampusBridge.', 'error')
     } finally { setLoading(false) }
   }
   return <div className="login-screen">
@@ -79,12 +143,13 @@ export function LoginPage() {
     </section>
     <section className="login-form-side"><div className="login-form-wrap">
       <div className="login-title"><div className="login-mark-mobile"><CampusMark /></div><h2>{register ? 'Create your account' : 'Welcome back'}</h2><p>{register ? 'Join your university community.' : 'Sign in to continue your academic journey.'}</p></div>
-      <div className="auth-tabs"><button className={!register ? 'selected' : ''} onClick={() => setRegister(false)}>Sign in</button><button className={register ? 'selected' : ''} onClick={() => setRegister(true)}>Create account</button></div>
+      <div className="auth-tabs"><button className={!register ? 'selected' : ''} onClick={() => setRegister(false)}>Sign in</button><button className={register ? 'selected' : ''} onClick={() => { setRegister(true); setRegistrationMessage('') }}>Create account</button></div>
+      {registrationMessage && <div className="registration-status" role="status"><CheckCircle2 size={18} /><div><strong>Signup request received</strong><p>{registrationMessage}</p></div><button type="button" aria-label="Dismiss message" onClick={() => setRegistrationMessage('')}><X size={15} /></button></div>}
       <form onSubmit={submit} className="auth-form">
         {register && <label>Full name<input required minLength="2" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Your name" /></label>}
         <label>University email address<input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@university.edu" autoComplete="email" /><small>Use your official university email address.</small></label>
         <label>Password<div className="password-field"><input required type={showPassword ? 'text' : 'password'} minLength={register ? 10 : 1} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder={register ? 'At least 10 characters' : 'Enter your password'} autoComplete={register ? 'new-password' : 'current-password'} /><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>
-        {register && <><label>Your role<select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}><option value="student">Student</option><option value="faculty">Faculty</option><option value="alumni">Alumni</option></select></label><label>Campus<select value={form.campus} onChange={e => setForm({ ...form, campus: e.target.value })}>{campuses.filter(item => item !== 'All Campuses').map(item => <option key={item}>{item}</option>)}</select></label></>}
+        {register && <><label>Your role<select value={form.role} onChange={e => { setForm({ ...form, role: e.target.value }); if (e.target.value !== 'student') { setCardFront(null); setCardBack(null) } }}><option value="student">Student</option><option value="faculty">Faculty</option><option value="alumni">Alumni</option></select></label><label>Campus<select value={form.campus} onChange={e => setForm({ ...form, campus: e.target.value })}>{campuses.filter(item => item !== 'All Campuses').map(item => <option key={item}>{item}</option>)}</select></label>{form.role === 'student' && <div className="university-card-fields"><p>Upload your university card so the admin can verify your student request.</p><label className="university-card-upload">University card · front side<input required type="file" accept="image/png,image/jpeg,image/webp" onChange={event => selectCardImage(event, setCardFront)} /><small>{cardFront?.name || 'PNG, JPG, or WebP · up to 2 MB'}</small></label><label className="university-card-upload">University card · back side<input required type="file" accept="image/png,image/jpeg,image/webp" onChange={event => selectCardImage(event, setCardBack)} /><small>{cardBack?.name || 'PNG, JPG, or WebP · up to 2 MB'}</small></label></div>}</>}
         {!register && <div className="auth-options"><label className="check-inline"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />Remember me</label><button type="button" className="text-button" onClick={() => notify('Password recovery needs a university email service connection.', 'info')}>Forgot password?</button></div>}
         <button className="button button-primary auth-submit" disabled={loading}>{loading ? 'Please wait…' : register ? 'Create account' : 'Sign in'}<ArrowRight size={16} /></button>
       </form>
@@ -374,9 +439,12 @@ export function AdminPage() {
   useEffect(() => { if (isLive) loadAdmin(); else { setAdminUsers(users); setOverview({ users: users.length, students: users.filter(item => item.role === 'student').length, faculty: users.filter(item => item.role === 'faculty').length, pending_faculty: users.filter(item => item.role === 'faculty' && !item.verified).length, posts: posts.length, pending_requests: 1 }) } }, [isLive, token])
   return <div className="admin-page"><PageHeading eyebrow="Platform management" title={user.role === 'system_admin' ? 'System administration' : 'Admin console'} description="Review accounts, verify faculty profiles, and moderate academic content." action={<button className="button button-secondary" onClick={loadAdmin}><Activity size={15} />Refresh overview</button>} />
     <div className="admin-metrics"><Metric icon={UsersRound} value={overview.users} label="Total accounts" tone="blue" /><Metric icon={GraduationCap} value={overview.students} label="Students" tone="violet" /><Metric icon={BriefcaseBusiness} value={overview.faculty} label="Faculty" tone="green" /><Metric icon={Clock3} value={overview.pending_faculty} label="Faculty pending review" tone="amber" /></div>
-    <section className="panel admin-panel"><div className="admin-tabs">{['Users', 'Content moderation'].map(item => <button key={item} className={tab === item ? 'profile-tab-active' : ''} onClick={() => setTab(item)}>{item}</button>)}</div>
+    <section className="panel admin-panel"><div className="admin-tabs">{['Users', 'Signup requests', 'Content moderation'].map(item => <button key={item} className={tab === item ? 'profile-tab-active' : ''} onClick={() => setTab(item)}>{item}</button>)}</div>
+      <div className={tab === 'Signup requests' ? 'admin-panel-content-hidden' : ''}>
       {tab === 'Users' ? <><div className="admin-toolbar"><div><h2>Manage university accounts</h2><p>Faculty profiles must be verified before they appear in the public directory.</p></div><label className="admin-search"><Search size={15} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, role…" onKeyDown={e => e.key === 'Enter' && loadAdmin()} /></label></div><div className="table-scroll"><table className="admin-table"><thead><tr><th>Member</th><th>Role</th><th>Campus / department</th><th>Status</th><th>Actions</th></tr></thead><tbody>{adminUsers.filter(person => !search || `${person.full_name} ${person.email} ${person.role}`.toLowerCase().includes(search.toLowerCase())).map(person => <tr key={person.id}><td><div className="table-user"><Avatar user={person} size="xs" /><span><strong>{person.full_name}</strong><small>{person.email}</small></span></div></td><td><RoleBadge user={person} /></td><td>{person.department || '—'}<small className="table-subtext">{person.campus}</small></td><td><span className={`admin-status ${person.active === false ? 'admin-disabled' : person.role === 'faculty' && !person.verified ? 'admin-pending' : 'admin-active'}`}><i />{person.active === false ? 'Inactive' : person.role === 'faculty' && !person.verified ? 'Pending verification' : 'Active'}</span></td><td><div className="table-actions">{person.role === 'faculty' && <button className="text-button" onClick={() => updateAdminUser(person, { verified: !person.verified })}>{person.verified ? 'Unverify' : 'Verify'}</button>}{person.id !== user.id && <button className="text-button text-danger" onClick={() => updateAdminUser(person, { active: person.active === false })}>{person.active === false ? 'Reactivate' : 'Deactivate'}</button>}</div></td></tr>)}</tbody></table></div>{!adminUsers.length && <div className="empty-state">No accounts found.</div>}</> : <><div className="admin-toolbar"><div><h2>Moderate academic posts</h2><p>Remove content that violates university community guidelines.</p></div><span className="muted-small">{posts.length} posts in feed</span></div><div className="moderation-list">{posts.map(post => <div className="moderation-row" key={post.id}><Avatar user={post.author} size="sm" /><div><strong>{post.title}</strong><small>{post.author?.full_name} · {formatDate(post.created_at)}</small><p>{post.content}</p></div><button className="button button-danger-soft button-small" onClick={() => removePost(post)}><X size={13} />Remove</button></div>)}{!posts.length && <div className="empty-state">There are no posts to review.</div>}</div></>}
+      </div>
     </section>
+    {tab === 'Signup requests' && <section className="panel signup-review-panel"><SignupRequestsPanel isLive={isLive} token={token} notify={notify} onApproved={loadAdmin} /></section>}
     <section className="panel profile-cover-admin-panel">
       <div className="admin-toolbar"><div><h2>Shared profile background</h2><p>Upload a shared image and set its display width and height for student, faculty, and alumni profiles. Only admins can change it.</p></div></div>
       <div className="cover-editor-grid">

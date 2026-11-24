@@ -16,6 +16,7 @@ export async function request(path, options = {}, token = localStorage.getItem('
 }
 
 export const postJson = (path, body, token) => request(path, { method: 'POST', body: JSON.stringify(body) }, token)
+export const postForm = (path, body, token) => request(path, { method: 'POST', body }, token)
 export const patchJson = (path, body, token) => request(path, { method: 'PATCH', body: JSON.stringify(body) }, token)
 export const putJson = (path, body, token) => request(path, { method: 'PUT', body: JSON.stringify(body) }, token)
 export const putForm = (path, body, token) => request(path, { method: 'PUT', body }, token)

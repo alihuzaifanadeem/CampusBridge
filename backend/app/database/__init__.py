@@ -1,5 +1,6 @@
 from .connection import Base, DATABASE_URL, SessionLocal, engine, get_db
 from .models import (
+    AccountRequest,
     CollaborationRequest,
     CollaborationResponse,
     Comment,
@@ -18,6 +19,7 @@ __all__ = [
     "engine",
     "get_db",
     "User",
+    "AccountRequest",
     "Post",
     "Comment",
     "PostLike",

@@ -158,6 +158,16 @@ kbd { flex: 0 0 auto; padding: 2px 5px; border: 1px solid #e6eaf1; border-radius
 .auth-tabs button { min-height: 34px; border: 0; border-radius: 8px; background: transparent; color: #78869b; font-size: 10px; font-weight: 700; }
 .auth-tabs button.selected { background: #fff; color: #205be0; box-shadow: 0 2px 5px rgba(25, 45, 83, .1); }
 .auth-form, .stack-form { display: flex; flex-direction: column; gap: 14px; }
+.registration-status { display: flex; align-items: flex-start; gap: 9px; padding: 11px; margin: -6px 0 14px; border: 1px solid #b8e6d0; border-radius: 9px; background: #effbf5; color: #17734d; }
+.registration-status > svg { flex: 0 0 auto; margin-top: 1px; }
+.registration-status strong { display: block; font-size: 10px; }
+.registration-status p { margin: 4px 0 0; color: #477c63; font-size: 9px; line-height: 1.55; }
+.registration-status button { display: grid; flex: 0 0 auto; place-items: center; margin-left: auto; padding: 2px; border: 0; background: transparent; color: #477c63; }
+.university-card-fields { display: flex; flex-direction: column; gap: 10px; padding: 11px; border: 1px solid #e2e9f3; border-radius: 10px; background: #fafcff; }
+.university-card-fields > p { margin: 0; color: #687890; font-size: 9px; line-height: 1.5; }
+.university-card-upload { display: flex; flex-direction: column; gap: 5px; color: #37465e; font-size: 9px; font-weight: 700; }
+.auth-form .university-card-upload input[type="file"] { min-height: 34px; padding: 6px; background: #fff; font-size: 9px; }
+.university-card-upload small { overflow-wrap: anywhere; }
 .auth-form > label, .stack-form > label, .post-editor > label { display: flex; flex-direction: column; gap: 6px; color: #37465e; font-size: 10px; font-weight: 700; }
 .auth-form input, .auth-form select, .stack-form input, .stack-form select, .stack-form textarea, .post-editor input, .post-editor textarea, .post-editor select, .compact-label input, .compact-label select { width: 100%; min-height: 39px; padding: 0 11px; border: 1px solid #dce3ed; border-radius: 8px; outline: 0; background: #fff; color: #25344c; font-size: 11px; font-weight: 500; }
 .auth-form input:focus, .auth-form select:focus, .stack-form input:focus, .stack-form textarea:focus, .post-editor input:focus, .post-editor textarea:focus, .compact-label input:focus { border-color: #83a7f2; box-shadow: 0 0 0 3px rgba(35, 92, 225, .08); }
