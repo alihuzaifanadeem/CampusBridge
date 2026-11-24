@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Activity, ArrowDownUp, ArrowLeft, ArrowRight, BadgeCheck, Bell, Bookmark, BookOpen, BriefcaseBusiness, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clock3, Eye, FileText, Filter, FlaskConical, GraduationCap, Heart, Link2, MapPin, MessageCircle, MoreHorizontal, Plus, Search, Send, Settings, ShieldCheck, SlidersHorizontal, Sparkles, ThumbsUp, UsersRound, X } from 'lucide-react'
 import { request, postJson, postForm, patchJson } from './api.js'
 import { campuses, demoAccounts, demoEvents } from './demoData.js'
-import { Avatar, CampusMark, EventIcon, FacultyIcon, Metric, RoleBadge, SectionTitle, StatusPill, initials } from './components.jsx'
+import { Avatar, CampusMark, EventIcon, FacultyIcon, Metric, RoleBadge, SectionTitle, StatusPill, Toast, initials } from './components.jsx'
 import { useCampusBridge } from './App.jsx'
 
 const categories = ['Academic Help', 'Faculty Guidance', 'Alumni Insights', 'Research Discussions', 'Final Year Project', 'Career Advice', 'Study Resources']
@@ -80,15 +80,20 @@ function SignupRequestsPanel({ isLive, token, notify, onApproved }) {
 }
 
 export function LoginPage() {
-  const { login, notify } = useCampusBridge()
+  const { login, notify, toast, clearToast } = useCampusBridge()
   const [register, setRegister] = useState(false)
   const [registrationMessage, setRegistrationMessage] = useState('')
+  const [authError, setAuthError] = useState('')
   const [cardFront, setCardFront] = useState(null)
   const [cardBack, setCardBack] = useState(null)
   const [form, setForm] = useState({ full_name: '', email: '', password: '', role: 'student', campus: 'Main Campus' })
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
+  const clearAuthFields = () => {
+    setForm({ full_name: '', email: '', password: '', role: 'student', campus: 'Main Campus' })
+    setCardFront(null); setCardBack(null); setShowPassword(false)
+  }
   const fillDemo = account => { setForm(current => ({ ...current, email: account.email, password: 'CampusBridge2026!' })); login(account.user); }
   const selectCardImage = (event, setImage) => {
     const file = event.target.files?.[0]
@@ -111,28 +116,40 @@ export function LoginPage() {
         if (cardFront) payload.append('card_front', cardFront)
         if (cardBack) payload.append('card_back', cardBack)
         const data = await postForm('/auth/register', payload, null)
-        setRegistrationMessage(data.message || 'Your request was received. You can sign in after university review and admin approval.')
+        setRegistrationMessage(`${data.message || 'Your request was received. You can sign in after university review and admin approval.'} Request submitted for ${form.email.trim()}.`)
         setRegister(false)
-        setForm(current => ({ ...current, password: '' }))
-        setCardFront(null); setCardBack(null)
+        setAuthError('')
+        clearAuthFields()
         notify('Signup request received. Your account is waiting for university approval.')
         return
       } else {
         const data = await postJson('/auth/login', { email: form.email, password: form.password }, null)
+        clearAuthFields()
+        setAuthError('')
         login(data.user, data.access_token)
       }
     } catch (error) {
-      if (register) notify(error.message || 'Could not submit your signup request. Please try again.', 'error')
+      if (register) {
+        const message = error.message || 'Could not submit your signup request. Please try again.'
+        setAuthError(message)
+        notify(message, 'error')
+      }
       else {
         const account = demoAccounts.find(item => item.email === form.email.toLowerCase())
         if (!error.status && account && form.password === 'CampusBridge2026!') {
+          clearAuthFields()
+          setAuthError('')
           login(account.user)
           notify('Demo session started. Your changes stay in this browser.')
-        } else notify(error.message || 'Could not connect to CampusBridge.', 'error')
+        } else {
+          const message = error.message || 'Could not connect to CampusBridge.'
+          setAuthError(message)
+          notify(message, 'error')
+        }
       }
     } finally { setLoading(false) }
   }
-  return <div className="login-screen">
+  return <><div className="login-screen">
     <section className="login-story">
       <div className="login-brand"><CampusMark /><strong>CampusBridge</strong></div>
       <div className="login-story-content"><div className="eyebrow eyebrow-light">A connected academic community</div><h1>Welcome to<br />CampusBridge</h1><p className="login-intro">A central place for university collaboration, mentorship, academic discussions, and professional networking.</p>
@@ -143,9 +160,10 @@ export function LoginPage() {
     </section>
     <section className="login-form-side"><div className="login-form-wrap">
       <div className="login-title"><div className="login-mark-mobile"><CampusMark /></div><h2>{register ? 'Create your account' : 'Welcome back'}</h2><p>{register ? 'Join your university community.' : 'Sign in to continue your academic journey.'}</p></div>
-      <div className="auth-tabs"><button className={!register ? 'selected' : ''} onClick={() => setRegister(false)}>Sign in</button><button className={register ? 'selected' : ''} onClick={() => { setRegister(true); setRegistrationMessage('') }}>Create account</button></div>
+      <div className="auth-tabs"><button className={!register ? 'selected' : ''} onClick={() => { setRegister(false); setAuthError('') }}>Sign in</button><button className={register ? 'selected' : ''} onClick={() => { setRegister(true); setRegistrationMessage(''); setAuthError('') }}>Create account</button></div>
       {registrationMessage && <div className="registration-status" role="status"><CheckCircle2 size={18} /><div><strong>Signup request received</strong><p>{registrationMessage}</p></div><button type="button" aria-label="Dismiss message" onClick={() => setRegistrationMessage('')}><X size={15} /></button></div>}
-      <form onSubmit={submit} className="auth-form">
+      {authError && <div className="auth-error-message" role="alert"><CircleHelp size={16} /><span>{authError}</span></div>}
+      <form onSubmit={submit} onInvalidCapture={() => setAuthError(register ? (form.role === 'student' ? 'Complete all required fields and choose both sides of your university card.' : 'Complete all required fields to submit your request.') : 'Enter your university email and password.')} onChangeCapture={() => authError && setAuthError('')} className="auth-form">
         {register && <label>Full name<input required minLength="2" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Your name" /></label>}
         <label>University email address<input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@university.edu" autoComplete="email" /><small>Use your official university email address.</small></label>
         <label>Password<div className="password-field"><input required type={showPassword ? 'text' : 'password'} minLength={register ? 10 : 1} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder={register ? 'At least 10 characters' : 'Enter your password'} autoComplete={register ? 'new-password' : 'current-password'} /><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>
@@ -158,7 +176,7 @@ export function LoginPage() {
         <details className="demo-access"><summary>Explore a demo account</summary><p>Demo accounts use sample profiles and keep edits in this browser.</p><div className="demo-buttons">{demoAccounts.map(account => <button key={account.role} onClick={() => fillDemo(account)}><Avatar user={account.user} size="xs" />{account.role}</button>)}</div><small>Password: <code>CampusBridge2026!</code></small></details>
       </>}
     </div><div className="login-footer">CampusBridge · University collaboration, in one place</div></section>
-  </div>
+  </div><Toast toast={toast} onClose={clearToast} /></>
 }
 
 function PostCard({ post, compact = false }) {

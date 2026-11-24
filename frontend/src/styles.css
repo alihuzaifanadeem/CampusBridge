@@ -163,6 +163,8 @@ kbd { flex: 0 0 auto; padding: 2px 5px; border: 1px solid #e6eaf1; border-radius
 .registration-status strong { display: block; font-size: 10px; }
 .registration-status p { margin: 4px 0 0; color: #477c63; font-size: 9px; line-height: 1.55; }
 .registration-status button { display: grid; flex: 0 0 auto; place-items: center; margin-left: auto; padding: 2px; border: 0; background: transparent; color: #477c63; }
+.auth-error-message { display: flex; align-items: flex-start; gap: 8px; padding: 10px 11px; margin: -6px 0 13px; border: 1px solid #f1c9c6; border-radius: 9px; background: #fff5f4; color: #a43f38; font-size: 9px; line-height: 1.5; }
+.auth-error-message svg { flex: 0 0 auto; margin-top: 1px; }
 .university-card-fields { display: flex; flex-direction: column; gap: 10px; padding: 11px; border: 1px solid #e2e9f3; border-radius: 10px; background: #fafcff; }
 .university-card-fields > p { margin: 0; color: #687890; font-size: 9px; line-height: 1.5; }
 .university-card-upload { display: flex; flex-direction: column; gap: 5px; color: #37465e; font-size: 9px; font-weight: 700; }

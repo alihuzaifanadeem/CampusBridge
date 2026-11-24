@@ -7,7 +7,8 @@ export async function request(path, options = {}, token = localStorage.getItem('
   const response = await fetch(`${API}${path}`, { ...options, headers })
   if (!response.ok) {
     const data = await response.json().catch(() => ({}))
-    const error = new Error(data.detail || `Request failed (${response.status})`)
+    const detail = Array.isArray(data.detail) ? data.detail.map(item => item.msg).filter(Boolean).join(' ') : data.detail
+    const error = new Error(detail || `Request failed (${response.status})`)
     error.status = response.status
     throw error
   }
