@@ -191,7 +191,7 @@ class ProfileCoverUpdate(BaseModel):
 PROFILE_COVER_MEDIA_DIR = Path(os.getenv("MEDIA_DIR", str(Path(__file__).resolve().parents[1] / "media")))
 PROFILE_COVER_MAX_BYTES = 2 * 1024 * 1024
 PROFILE_AVATAR_MEDIA_DIR = PROFILE_COVER_MEDIA_DIR / "avatars"
-PROFILE_AVATAR_MAX_BYTES = 2 * 1024 * 1024
+PROFILE_AVATAR_MAX_BYTES = 10 * 1024 * 1024
 
 
 def profile_avatar_file(filename: str) -> tuple[Path, str]:
@@ -489,7 +489,7 @@ async def update_profile_avatar(
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Choose a non-empty image file.")
     if len(image_bytes) > PROFILE_AVATAR_MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Profile images must be 2 MB or smaller.")
+        raise HTTPException(status_code=413, detail="Profile images must be 10 MB or smaller.")
     if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
         extension = "png"
     elif image_bytes.startswith(b"\xff\xd8\xff"):
